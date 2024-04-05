@@ -11,7 +11,6 @@ use client::{
     self, proto::PeerId, ChannelId, Client, Connection, Credentials, EstablishConnectionError,
     UserStore,
 };
-use clock::FakeSystemClock;
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};
 use fs::FakeFs;
@@ -162,7 +161,6 @@ impl TestServer {
             client::init_settings(cx);
         });
 
-        let clock = Arc::new(FakeSystemClock::default());
         let http = FakeHttpClient::with_404_response();
         let user_id = if let Ok(Some(user)) = self.app_state.db.get_user_by_github_login(name).await
         {
@@ -185,7 +183,7 @@ impl TestServer {
                 .user_id
         };
         let client_name = name.to_string();
-        let mut client = cx.update(|cx| Client::new(clock, http.clone(), cx));
+        let mut client = Client::new(http.clone());
         let server = self.server.clone();
         let db = self.app_state.db.clone();
         let connection_killers = self.connection_killers.clone();

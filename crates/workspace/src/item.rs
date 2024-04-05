@@ -123,10 +123,6 @@ pub trait Item: FocusableView + EventEmitter<Self::Event> {
         None
     }
 
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        None
-    }
-
     /// (model id, Item)
     fn for_each_project_item(
         &self,
@@ -241,7 +237,6 @@ pub trait ItemHandle: 'static + Send {
     fn tab_tooltip_text(&self, cx: &AppContext) -> Option<SharedString>;
     fn tab_description(&self, detail: usize, cx: &AppContext) -> Option<SharedString>;
     fn tab_content(&self, detail: Option<usize>, selected: bool, cx: &WindowContext) -> AnyElement;
-    fn telemetry_event_text(&self, cx: &WindowContext) -> Option<&'static str>;
     fn dragged_tab_content(&self, detail: Option<usize>, cx: &WindowContext) -> AnyElement;
     fn project_path(&self, cx: &AppContext) -> Option<ProjectPath>;
     fn project_entry_ids(&self, cx: &AppContext) -> SmallVec<[ProjectEntryId; 3]>;
@@ -333,10 +328,6 @@ impl<T: Item> ItemHandle for View<T> {
 
     fn tab_tooltip_text(&self, cx: &AppContext) -> Option<SharedString> {
         self.read(cx).tab_tooltip_text(cx)
-    }
-
-    fn telemetry_event_text(&self, cx: &WindowContext) -> Option<&'static str> {
-        self.read(cx).telemetry_event_text()
     }
 
     fn tab_description(&self, detail: usize, cx: &AppContext) -> Option<SharedString> {
@@ -988,10 +979,6 @@ pub mod test {
                 let description = *descriptions.get(detail).or_else(|| descriptions.last())?;
                 Some(description.into())
             })
-        }
-
-        fn telemetry_event_text(&self) -> Option<&'static str> {
-            None
         }
 
         fn tab_content(

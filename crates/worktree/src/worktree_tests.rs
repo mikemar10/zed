@@ -4,7 +4,6 @@ use crate::{
 };
 use anyhow::Result;
 use client::Client;
-use clock::FakeSystemClock;
 use fs::{repository::GitFileStatus, FakeFs, Fs, RealFs, RemoveOptions};
 use git::GITIGNORE;
 use gpui::{BorrowAppContext, ModelContext, Task, TestAppContext};
@@ -41,7 +40,7 @@ async fn test_traversal(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs,
@@ -112,7 +111,7 @@ async fn test_descendent_entries(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs,
@@ -214,7 +213,7 @@ async fn test_circular_symlinks(cx: &mut TestAppContext) {
         .unwrap();
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs.clone(),
@@ -314,7 +313,7 @@ async fn test_symlinks_pointing_outside(cx: &mut TestAppContext) {
         .unwrap();
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root/dir1"),
         true,
         fs.clone(),
@@ -542,7 +541,7 @@ async fn test_open_gitignored_files(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs.clone(),
@@ -709,7 +708,7 @@ async fn test_dirs_no_longer_ignored(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs.clone(),
@@ -829,7 +828,7 @@ async fn test_rescan_with_gitignore(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         "/root/tree".as_ref(),
         true,
         fs.clone(),
@@ -911,7 +910,7 @@ async fn test_update_gitignore(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         "/root".as_ref(),
         true,
         fs.clone(),
@@ -966,7 +965,7 @@ async fn test_write_file(cx: &mut TestAppContext) {
     }));
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         dir.path(),
         true,
         Arc::new(RealFs),
@@ -1046,7 +1045,7 @@ async fn test_file_scan_exclusions(cx: &mut TestAppContext) {
     });
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         dir.path(),
         true,
         Arc::new(RealFs),
@@ -1150,7 +1149,7 @@ async fn test_fs_events_in_exclusions(cx: &mut TestAppContext) {
     });
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         dir.path(),
         true,
         Arc::new(RealFs),
@@ -1260,7 +1259,7 @@ async fn test_fs_events_in_dot_git_worktree(cx: &mut TestAppContext) {
     let dot_git_worktree_dir = dir.path().join(".git");
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         dot_git_worktree_dir.clone(),
         true,
         Arc::new(RealFs),
@@ -1299,7 +1298,7 @@ async fn test_create_directory_during_initial_scan(cx: &mut TestAppContext) {
     .await;
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         "/root".as_ref(),
         true,
         fs,
@@ -1349,13 +1348,7 @@ async fn test_create_directory_during_initial_scan(cx: &mut TestAppContext) {
 async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
     init_test(cx);
     cx.executor().allow_parking();
-    let client_fake = cx.update(|cx| {
-        Client::new(
-            Arc::new(FakeSystemClock::default()),
-            FakeHttpClient::with_404_response(),
-            cx,
-        )
-    });
+    let client_fake = Client::new(FakeHttpClient::with_404_response());
 
     let fs_fake = FakeFs::new(cx.background_executor.clone());
     fs_fake
@@ -1396,13 +1389,7 @@ async fn test_create_dir_all_on_create_entry(cx: &mut TestAppContext) {
         assert!(tree.entry_for_path("a/b/").unwrap().is_dir());
     });
 
-    let client_real = cx.update(|cx| {
-        Client::new(
-            Arc::new(FakeSystemClock::default()),
-            FakeHttpClient::with_404_response(),
-            cx,
-        )
-    });
+    let client_real = Client::new(FakeHttpClient::with_404_response());
 
     let fs_real = Arc::new(RealFs);
     let temp_root = temp_tree(json!({
@@ -1498,7 +1485,7 @@ async fn test_random_worktree_operations_during_initial_scan(
     log::info!("generated initial tree");
 
     let worktree = Worktree::local(
-        build_client(cx),
+        build_client(),
         root_dir,
         true,
         fs.clone(),
@@ -1588,7 +1575,7 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
     log::info!("generated initial tree");
 
     let worktree = Worktree::local(
-        build_client(cx),
+        build_client(),
         root_dir,
         true,
         fs.clone(),
@@ -1661,7 +1648,7 @@ async fn test_random_worktree_changes(cx: &mut TestAppContext, mut rng: StdRng) 
 
     {
         let new_worktree = Worktree::local(
-            build_client(cx),
+            build_client(),
             root_dir,
             true,
             fs.clone(),
@@ -2005,7 +1992,7 @@ async fn test_rename_work_directory(cx: &mut TestAppContext) {
     let root_path = root.path();
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         root_path,
         true,
         Arc::new(RealFs),
@@ -2084,7 +2071,7 @@ async fn test_git_repository_for_path(cx: &mut TestAppContext) {
     }));
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         root.path(),
         true,
         Arc::new(RealFs),
@@ -2225,7 +2212,7 @@ async fn test_git_status(cx: &mut TestAppContext) {
     git_commit("Initial commit", &repo);
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         root.path(),
         true,
         Arc::new(RealFs),
@@ -2414,7 +2401,7 @@ async fn test_propagate_git_statuses(cx: &mut TestAppContext) {
     );
 
     let tree = Worktree::local(
-        build_client(cx),
+        build_client(),
         Path::new("/root"),
         true,
         fs.clone(),
@@ -2493,10 +2480,9 @@ async fn test_propagate_git_statuses(cx: &mut TestAppContext) {
     }
 }
 
-fn build_client(cx: &mut TestAppContext) -> Arc<Client> {
-    let clock = Arc::new(FakeSystemClock::default());
+fn build_client() -> Arc<Client> {
     let http_client = FakeHttpClient::with_404_response();
-    cx.update(|cx| Client::new(clock, http_client, cx))
+    Client::new(http_client)
 }
 
 #[track_caller]

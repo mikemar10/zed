@@ -1,12 +1,11 @@
 use anyhow::Result;
-use client::telemetry::Telemetry;
 use copilot::Copilot;
 use editor::{Direction, InlineCompletionProvider};
 use gpui::{AppContext, EntityId, Model, ModelContext, Task};
 use language::language_settings::AllLanguageSettings;
 use language::{language_settings::all_language_settings, Buffer, OffsetRangeExt, ToOffset};
 use settings::Settings;
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{path::Path, time::Duration};
 
 pub const COPILOT_DEBOUNCE_TIMEOUT: Duration = Duration::from_millis(75);
 
@@ -19,7 +18,6 @@ pub struct CopilotCompletionProvider {
     pending_refresh: Task<Result<()>>,
     pending_cycling_refresh: Task<Result<()>>,
     copilot: Model<Copilot>,
-    telemetry: Option<Arc<Telemetry>>,
 }
 
 impl CopilotCompletionProvider {
@@ -33,13 +31,7 @@ impl CopilotCompletionProvider {
             pending_refresh: Task::ready(Ok(())),
             pending_cycling_refresh: Task::ready(Ok(())),
             copilot,
-            telemetry: None,
         }
-    }
-
-    pub fn with_telemetry(mut self, telemetry: Arc<Telemetry>) -> Self {
-        self.telemetry = Some(telemetry);
-        self
     }
 
     fn active_completion(&self) -> Option<&copilot::Completion> {
@@ -184,13 +176,6 @@ impl InlineCompletionProvider for CopilotCompletionProvider {
             self.copilot
                 .update(cx, |copilot, cx| copilot.accept_completion(completion, cx))
                 .detach_and_log_err(cx);
-            if let Some(telemetry) = self.telemetry.as_ref() {
-                telemetry.report_copilot_event(
-                    Some(completion.uuid.clone()),
-                    true,
-                    self.file_extension.clone(),
-                );
-            }
         }
     }
 
@@ -205,9 +190,6 @@ impl InlineCompletionProvider for CopilotCompletionProvider {
                 copilot.discard_completions(&self.completions, cx)
             })
             .detach_and_log_err(cx);
-        if let Some(telemetry) = self.telemetry.as_ref() {
-            telemetry.report_copilot_event(None, false, self.file_extension.clone());
-        }
     }
 
     fn active_completion_text(

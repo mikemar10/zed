@@ -2,7 +2,6 @@ mod components;
 mod extension_suggest;
 
 use crate::components::ExtensionCard;
-use client::telemetry::Telemetry;
 use client::ExtensionMetadata;
 use editor::{Editor, EditorElement, EditorStyle};
 use extension::{ExtensionManifest, ExtensionStatus, ExtensionStore};
@@ -95,7 +94,6 @@ impl ExtensionFilter {
 
 pub struct ExtensionsPage {
     list: UniformListScrollHandle,
-    telemetry: Arc<Telemetry>,
     is_fetching_extensions: bool,
     filter: ExtensionFilter,
     remote_extension_entries: Vec<ExtensionMetadata>,
@@ -132,7 +130,6 @@ impl ExtensionsPage {
 
             let mut this = Self {
                 list: UniformListScrollHandle::new(),
-                telemetry: workspace.client().telemetry().clone(),
                 is_fetching_extensions: false,
                 filter: ExtensionFilter::All,
                 dev_extension_entries: Vec::new(),
@@ -484,9 +481,7 @@ impl ExtensionsPage {
                     cx.listener({
                         let extension_id = extension.id.clone();
                         let version = extension.manifest.version.clone();
-                        move |this, _, cx| {
-                            this.telemetry
-                                .report_app_event("extensions: install extension".to_string());
+                        move |_, _, cx| {
                             ExtensionStore::global(cx).update(cx, |store, cx| {
                                 store.install_extension(extension_id.clone(), version.clone(), cx)
                             });
@@ -509,9 +504,7 @@ impl ExtensionsPage {
                 Button::new(SharedString::from(extension.id.clone()), "Uninstall").on_click(
                     cx.listener({
                         let extension_id = extension.id.clone();
-                        move |this, _, cx| {
-                            this.telemetry
-                                .report_app_event("extensions: uninstall extension".to_string());
+                        move |_, _, cx| {
                             ExtensionStore::global(cx).update(cx, |store, cx| {
                                 store.uninstall_extension(extension_id.clone(), cx)
                             });
@@ -526,10 +519,7 @@ impl ExtensionsPage {
                             cx.listener({
                                 let extension_id = extension.id.clone();
                                 let version = extension.manifest.version.clone();
-                                move |this, _, cx| {
-                                    this.telemetry.report_app_event(
-                                        "extensions: install extension".to_string(),
-                                    );
+                                move |_, _, cx| {
                                     ExtensionStore::global(cx).update(cx, |store, cx| {
                                         store.upgrade_extension(
                                             extension_id.clone(),
@@ -829,10 +819,6 @@ impl Item for ExtensionsPage {
                 Color::Muted
             })
             .into_any_element()
-    }
-
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        Some("extensions page")
     }
 
     fn show_toolbar(&self) -> bool {

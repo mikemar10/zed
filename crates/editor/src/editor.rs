@@ -110,7 +110,6 @@ use std::{
     mem,
     num::NonZeroU32,
     ops::{ControlFlow, Deref, DerefMut, Range, RangeInclusive},
-    path::Path,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -1502,7 +1501,6 @@ impl Editor {
             cx.set_global(ScrollbarAutoHide(should_auto_hide_scrollbars));
         }
 
-        this.report_editor_event("open", None, cx);
         this
     }
 
@@ -9311,10 +9309,6 @@ impl Editor {
                         }
                     }
                 }
-
-                let Some(project) = &self.project else { return };
-                let telemetry = project.read(cx).client().telemetry().clone();
-                telemetry.log_edit_event("editor");
             }
             multi_buffer::Event::ExcerptsAdded {
                 buffer,
@@ -9518,52 +9512,6 @@ impl Editor {
                     ..snapshot.clip_offset_utf16(selection.end, Bias::Right)
             })
             .collect()
-    }
-
-    fn report_editor_event(
-        &self,
-        operation: &'static str,
-        file_extension: Option<String>,
-        cx: &AppContext,
-    ) {
-        if cfg!(any(test, feature = "test-support")) {
-            return;
-        }
-
-        let Some(project) = &self.project else { return };
-
-        // If None, we are in a file without an extension
-        let file = self
-            .buffer
-            .read(cx)
-            .as_singleton()
-            .and_then(|b| b.read(cx).file());
-        let file_extension = file_extension.or(file
-            .as_ref()
-            .and_then(|file| Path::new(file.file_name(cx)).extension())
-            .and_then(|e| e.to_str())
-            .map(|a| a.to_string()));
-
-        let vim_mode = cx
-            .global::<SettingsStore>()
-            .raw_user_settings()
-            .get("vim_mode")
-            == Some(&serde_json::Value::Bool(true));
-        let copilot_enabled = all_language_settings(file, cx).copilot_enabled(None, None);
-        let copilot_enabled_for_language = self
-            .buffer
-            .read(cx)
-            .settings_at(0, cx)
-            .show_copilot_suggestions;
-
-        let telemetry = project.read(cx).client().telemetry().clone();
-        telemetry.report_editor_event(
-            file_extension,
-            vim_mode,
-            operation,
-            copilot_enabled,
-            copilot_enabled_for_language,
-        )
     }
 
     /// Copy the highlighted chunks to the clipboard as JSON. The format is an array of lines,

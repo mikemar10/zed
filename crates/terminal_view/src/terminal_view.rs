@@ -757,7 +757,6 @@ impl Render for TerminalView {
                 // TODO: Oddly this wrapper div is needed for TerminalElement to not steal events from the context menu
                 div().size_full().child(TerminalElement::new(
                     terminal_handle,
-                    self.workspace.clone(),
                     self.focus_handle.clone(),
                     focused,
                     self.should_show_cursor(focused, cx),
@@ -802,10 +801,6 @@ impl Item for TerminalView {
                 Color::Muted
             }))
             .into_any()
-    }
-
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        None
     }
 
     fn clone_on_split(

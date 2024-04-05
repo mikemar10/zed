@@ -8,9 +8,7 @@ use backtrace::Backtrace;
 use chrono::Utc;
 use clap::{command, Parser};
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{
-    parse_zed_link, telemetry::Telemetry, Client, ClientSettings, DevServerToken, UserStore,
-};
+use client::{parse_zed_link, Client, ClientSettings, DevServerToken, UserStore};
 use collab_ui::channel_view::ChannelView;
 use copilot::Copilot;
 use copilot_ui::CopilotCompletionProvider;
@@ -21,7 +19,6 @@ use fs::RealFs;
 use futures::{future, StreamExt};
 use gpui::{App, AppContext, AsyncAppContext, Context, SemanticVersion, Task, ViewContext};
 use image_viewer;
-use isahc::{prelude::Configurable, Request};
 use language::LanguageRegistry;
 use log::LevelFilter;
 
@@ -38,7 +35,6 @@ use simplelog::ConfigBuilder;
 use smol::process::Command;
 use std::{
     env,
-    ffi::OsStr,
     fs::OpenOptions,
     io::{IsTerminal, Write},
     panic,
@@ -50,14 +46,9 @@ use std::{
     thread,
 };
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry, ThemeSettings};
-use util::{
-    http::{HttpClient, HttpClientWithUrl},
-    maybe,
-    paths::{self, CRASHES_DIR, CRASHES_RETIRED_DIR},
-    ResultExt, TryFutureExt,
-};
+use util::{http::HttpClientWithUrl, maybe, paths, ResultExt, TryFutureExt};
 use uuid::Uuid;
-use welcome::{show_welcome_view, BaseKeymap, FIRST_OPEN};
+use welcome::{show_welcome_view, FIRST_OPEN};
 use workspace::{AppState, WorkspaceStore};
 use zed::{
     app_menus, build_window_options, ensure_only_instance, handle_cli_connection,
@@ -82,7 +73,7 @@ fn main() {
     log::info!("========== starting zed ==========");
     let app = App::new().with_assets(Assets);
 
-    let (installation_id, existing_installation_id_found) = app
+    let (installation_id, _existing_installation_id_found) = app
         .background_executor()
         .block(installation_id())
         .ok()
@@ -144,12 +135,11 @@ fn main() {
         handle_keymap_file_changes(user_keymap_file_rx, cx);
         client::init_settings(cx);
 
-        let clock = Arc::new(clock::RealSystemClock);
         let http = Arc::new(HttpClientWithUrl::new(
             &client::ClientSettings::get_global(cx).server_url,
         ));
 
-        let client = client::Client::new(clock, http.clone(), cx);
+        let client = client::Client::new(http.clone());
         let mut languages =
             LanguageRegistry::new(login_shell_env_loaded, cx.background_executor().clone());
         let copilot_language_server_id = languages.next_language_server_id();
@@ -180,7 +170,7 @@ fn main() {
             cx,
         );
         assistant::init(client.clone(), cx);
-        init_inline_completion_provider(client.telemetry().clone(), cx);
+        init_inline_completion_provider(cx);
 
         extension::init(
             fs.clone(),
@@ -215,19 +205,6 @@ fn main() {
         })
         .detach();
 
-        let telemetry = client.telemetry();
-        telemetry.start(installation_id, session_id, cx);
-        telemetry.report_setting_event("theme", cx.theme().name.to_string());
-        telemetry.report_setting_event("keymap", BaseKeymap::get_global(cx).to_string());
-        telemetry.report_app_event(
-            match existing_installation_id_found {
-                Some(false) => "first open",
-                _ => "open",
-            }
-            .to_string(),
-        );
-        telemetry.flush_events();
-
         let app_state = Arc::new(AppState {
             languages: languages.clone(),
             client: client.clone(),
@@ -240,7 +217,6 @@ fn main() {
         AppState::set_global(Arc::downgrade(&app_state), cx);
 
         audio::init(Assets, cx);
-        auto_update::init(http.clone(), cx);
 
         workspace::init(app_state.clone(), cx);
         recent_projects::init(cx);
@@ -270,9 +246,6 @@ fn main() {
 
         cx.set_menus(app_menus());
         initialize_workspace(app_state.clone(), cx);
-
-        // todo(linux): unblock this
-        upload_panics_and_crashes(http.clone(), cx);
 
         cx.activate(true);
 
@@ -707,162 +680,6 @@ fn init_panic_hook(app: &App, installation_id: Option<String>, session_id: Strin
     }));
 }
 
-fn upload_panics_and_crashes(http: Arc<HttpClientWithUrl>, cx: &mut AppContext) {
-    let telemetry_settings = *client::TelemetrySettings::get_global(cx);
-    cx.background_executor()
-        .spawn(async move {
-            let most_recent_panic = upload_previous_panics(http.clone(), telemetry_settings)
-                .await
-                .log_err()
-                .flatten();
-            upload_previous_crashes(http, most_recent_panic, telemetry_settings)
-                .await
-                .log_err()
-        })
-        .detach()
-}
-
-/// Uploads panics via `zed.dev`.
-async fn upload_previous_panics(
-    http: Arc<HttpClientWithUrl>,
-    telemetry_settings: client::TelemetrySettings,
-) -> Result<Option<(i64, String)>> {
-    let panic_report_url = http.build_url("/api/panic");
-    let mut children = smol::fs::read_dir(&*paths::LOGS_DIR).await?;
-
-    let mut most_recent_panic = None;
-
-    while let Some(child) = children.next().await {
-        let child = child?;
-        let child_path = child.path();
-
-        if child_path.extension() != Some(OsStr::new("panic")) {
-            continue;
-        }
-        let filename = if let Some(filename) = child_path.file_name() {
-            filename.to_string_lossy()
-        } else {
-            continue;
-        };
-
-        if !filename.starts_with("zed") {
-            continue;
-        }
-
-        if telemetry_settings.diagnostics {
-            let panic_file_content = smol::fs::read_to_string(&child_path)
-                .await
-                .context("error reading panic file")?;
-
-            let panic: Option<Panic> = serde_json::from_str(&panic_file_content)
-                .ok()
-                .or_else(|| {
-                    panic_file_content
-                        .lines()
-                        .next()
-                        .and_then(|line| serde_json::from_str(line).ok())
-                })
-                .unwrap_or_else(|| {
-                    log::error!("failed to deserialize panic file {:?}", panic_file_content);
-                    None
-                });
-
-            if let Some(panic) = panic {
-                most_recent_panic = Some((panic.panicked_on, panic.payload.clone()));
-
-                let body = serde_json::to_string(&PanicRequest { panic }).unwrap();
-
-                let request = Request::post(&panic_report_url)
-                    .redirect_policy(isahc::config::RedirectPolicy::Follow)
-                    .header("Content-Type", "application/json")
-                    .body(body.into())?;
-                let response = http.send(request).await.context("error sending panic")?;
-                if !response.status().is_success() {
-                    log::error!("Error uploading panic to server: {}", response.status());
-                }
-            }
-        }
-
-        // We've done what we can, delete the file
-        std::fs::remove_file(child_path)
-            .context("error removing panic")
-            .log_err();
-    }
-    Ok::<_, anyhow::Error>(most_recent_panic)
-}
-
-static LAST_CRASH_UPLOADED: &'static str = "LAST_CRASH_UPLOADED";
-
-/// upload crashes from apple's diagnostic reports to our server.
-/// (only if telemetry is enabled)
-async fn upload_previous_crashes(
-    http: Arc<HttpClientWithUrl>,
-    most_recent_panic: Option<(i64, String)>,
-    telemetry_settings: client::TelemetrySettings,
-) -> Result<()> {
-    if !telemetry_settings.diagnostics {
-        return Ok(());
-    }
-    let last_uploaded = KEY_VALUE_STORE
-        .read_kvp(LAST_CRASH_UPLOADED)?
-        .unwrap_or("zed-2024-01-17-221900.ips".to_string()); // don't upload old crash reports from before we had this.
-    let mut uploaded = last_uploaded.clone();
-
-    let crash_report_url = http.build_zed_api_url("/telemetry/crashes", &[])?;
-
-    for dir in [&*CRASHES_DIR, &*CRASHES_RETIRED_DIR] {
-        let mut children = smol::fs::read_dir(&dir).await?;
-        while let Some(child) = children.next().await {
-            let child = child?;
-            let Some(filename) = child
-                .path()
-                .file_name()
-                .map(|f| f.to_string_lossy().to_lowercase())
-            else {
-                continue;
-            };
-
-            if !filename.starts_with("zed-") || !filename.ends_with(".ips") {
-                continue;
-            }
-
-            if filename <= last_uploaded {
-                continue;
-            }
-
-            let body = smol::fs::read_to_string(&child.path())
-                .await
-                .context("error reading crash file")?;
-
-            let mut request = Request::post(&crash_report_url.to_string())
-                .redirect_policy(isahc::config::RedirectPolicy::Follow)
-                .header("Content-Type", "text/plain");
-
-            if let Some((panicked_on, payload)) = most_recent_panic.as_ref() {
-                request = request
-                    .header("x-zed-panicked-on", format!("{}", panicked_on))
-                    .header("x-zed-panic", payload)
-            }
-
-            let request = request.body(body.into())?;
-
-            let response = http.send(request).await.context("error sending crash")?;
-            if !response.status().is_success() {
-                log::error!("Error uploading crash to server: {}", response.status());
-            }
-
-            if uploaded < filename {
-                uploaded = filename.clone();
-                KEY_VALUE_STORE
-                    .write_kvp(LAST_CRASH_UPLOADED.to_string(), filename)
-                    .await?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
 async fn load_login_shell_environment() -> Result<()> {
     let marker = "ZED_LOGIN_SHELL_START";
     let shell = env::var("SHELL").context(
@@ -1073,7 +890,7 @@ fn watch_file_types(fs: Arc<dyn fs::Fs>, cx: &mut AppContext) {
 #[cfg(not(debug_assertions))]
 fn watch_file_types(_fs: Arc<dyn fs::Fs>, _cx: &mut AppContext) {}
 
-fn init_inline_completion_provider(telemetry: Arc<Telemetry>, cx: &mut AppContext) {
+fn init_inline_completion_provider(cx: &mut AppContext) {
     if let Some(copilot) = Copilot::global(cx) {
         cx.observe_new_views(move |editor: &mut Editor, cx: &mut ViewContext<Editor>| {
             if editor.mode() == EditorMode::Full {
@@ -1104,10 +921,7 @@ fn init_inline_completion_provider(telemetry: Arc<Telemetry>, cx: &mut AppContex
                         },
                     ));
 
-                let provider = cx.new_model(|_| {
-                    CopilotCompletionProvider::new(copilot.clone())
-                        .with_telemetry(telemetry.clone())
-                });
+                let provider = cx.new_model(|_| CopilotCompletionProvider::new(copilot.clone()));
                 editor.set_inline_completion_provider(provider, cx)
             }
         })

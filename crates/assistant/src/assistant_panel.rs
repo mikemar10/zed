@@ -35,7 +35,6 @@ use project::Project;
 use search::{buffer_search::DivRegistrar, BufferSearchBar};
 use settings::Settings;
 use std::{cmp, fmt::Write, iter, ops::Range, path::PathBuf, sync::Arc, time::Duration};
-use telemetry_events::AssistantKind;
 use theme::ThemeSettings;
 use ui::{
     prelude::*,
@@ -325,7 +324,6 @@ impl AssistantPanel {
                 self.include_conversation_in_next_inline_assist,
                 self.inline_prompt_history.clone(),
                 codegen.clone(),
-                self.workspace.clone(),
                 cx,
             )
         });
@@ -715,7 +713,6 @@ impl AssistantPanel {
                 self.model.clone(),
                 self.languages.clone(),
                 self.fs.clone(),
-                self.workspace.clone(),
                 cx,
             )
         });
@@ -974,7 +971,6 @@ impl AssistantPanel {
         cx.focus(&self.focus_handle);
 
         let fs = self.fs.clone();
-        let workspace = self.workspace.clone();
         let languages = self.languages.clone();
         cx.spawn(|this, mut cx| async move {
             let saved_conversation = SavedConversation::load(&path, fs.as_ref()).await?;
@@ -989,9 +985,8 @@ impl AssistantPanel {
             .await?;
 
             this.update(&mut cx, |this, cx| {
-                let editor = cx.new_view(|cx| {
-                    ConversationEditor::for_conversation(conversation, fs, workspace, cx)
-                });
+                let editor =
+                    cx.new_view(|cx| ConversationEditor::for_conversation(conversation, fs, cx));
                 this.show_conversation(editor, cx);
             })?;
             Ok(())
@@ -1990,7 +1985,6 @@ struct ScrollPosition {
 struct ConversationEditor {
     conversation: Model<Conversation>,
     fs: Arc<dyn Fs>,
-    workspace: WeakView<Workspace>,
     editor: View<Editor>,
     blocks: HashSet<BlockId>,
     scroll_position: Option<ScrollPosition>,
@@ -2002,17 +1996,15 @@ impl ConversationEditor {
         model: LanguageModel,
         language_registry: Arc<LanguageRegistry>,
         fs: Arc<dyn Fs>,
-        workspace: WeakView<Workspace>,
         cx: &mut ViewContext<Self>,
     ) -> Self {
         let conversation = cx.new_model(|cx| Conversation::new(model, language_registry, cx));
-        Self::for_conversation(conversation, fs, workspace, cx)
+        Self::for_conversation(conversation, fs, cx)
     }
 
     fn for_conversation(
         conversation: Model<Conversation>,
         fs: Arc<dyn Fs>,
-        workspace: WeakView<Workspace>,
         cx: &mut ViewContext<Self>,
     ) -> Self {
         let editor = cx.new_view(|cx| {
@@ -2035,7 +2027,6 @@ impl ConversationEditor {
             blocks: Default::default(),
             scroll_position: None,
             fs,
-            workspace,
             _subscriptions,
         };
         this.update_message_headers(cx);
@@ -2043,15 +2034,6 @@ impl ConversationEditor {
     }
 
     fn assist(&mut self, _: &Assist, cx: &mut ViewContext<Self>) {
-        self.conversation.update(cx, |conversation, cx| {
-            report_assistant_event(
-                self.workspace.clone(),
-                Some(conversation),
-                AssistantKind::Panel,
-                cx,
-            )
-        });
-
         let cursors = self.cursors(cx);
 
         let user_messages = self.conversation.update(cx, |conversation, cx| {
@@ -2481,7 +2463,6 @@ enum InlineAssistantEvent {
 struct InlineAssistant {
     id: usize,
     prompt_editor: View<Editor>,
-    workspace: WeakView<Workspace>,
     confirmed: bool,
     include_conversation: bool,
     measurements: Arc<Mutex<BlockMeasurements>>,
@@ -2559,7 +2540,6 @@ impl InlineAssistant {
         include_conversation: bool,
         prompt_history: VecDeque<String>,
         codegen: Model<Codegen>,
-        workspace: WeakView<Workspace>,
         cx: &mut ViewContext<Self>,
     ) -> Self {
         let prompt_editor = cx.new_view(|cx| {
@@ -2581,7 +2561,6 @@ impl InlineAssistant {
         Self {
             id,
             prompt_editor,
-            workspace,
             confirmed: false,
             include_conversation,
             measurements,
@@ -2629,8 +2608,6 @@ impl InlineAssistant {
         if self.confirmed {
             cx.emit(InlineAssistantEvent::Dismissed);
         } else {
-            report_assistant_event(self.workspace.clone(), None, AssistantKind::Inline, cx);
-
             let prompt = self.prompt_editor.read(cx).text(cx);
             self.prompt_editor
                 .update(cx, |editor, _cx| editor.set_read_only(true));
@@ -2758,30 +2735,6 @@ fn merge_ranges(ranges: &mut Vec<Range<Anchor>>, buffer: &MultiBufferSnapshot) {
             ix += 1;
         }
     }
-}
-
-fn report_assistant_event(
-    workspace: WeakView<Workspace>,
-    conversation: Option<&Conversation>,
-    assistant_kind: AssistantKind,
-    cx: &mut AppContext,
-) {
-    let Some(workspace) = workspace.upgrade() else {
-        return;
-    };
-
-    let client = workspace.read(cx).project().read(cx).client();
-    let telemetry = client.telemetry();
-
-    let conversation_id = conversation.and_then(|conversation| conversation.id.clone());
-    let model_id = conversation
-        .map(|c| c.model.telemetry_id())
-        .unwrap_or_else(|| {
-            CompletionProvider::global(cx)
-                .default_model()
-                .telemetry_id()
-        });
-    telemetry.report_assistant_event(conversation_id, assistant_kind, model_id)
 }
 
 #[cfg(test)]
