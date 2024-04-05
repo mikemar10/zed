@@ -1,8 +1,6 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
-pub mod user;
-
 use anyhow::{anyhow, Context as _, Result};
 use async_recursion::async_recursion;
 use async_tungstenite::tungstenite::{
@@ -46,8 +44,6 @@ use util::http::{HttpClient, HttpClientWithUrl};
 use util::{ResultExt, TryFutureExt};
 
 pub use rpc::*;
-pub use user::*;
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DevServerToken(pub String);
 
@@ -1447,9 +1443,8 @@ mod tests {
     #[gpui::test(iterations = 10)]
     async fn test_reconnection(cx: &mut TestAppContext) {
         init_test(cx);
-        let user_id = 5;
         let client = Client::new(FakeHttpClient::with_404_response());
-        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let server = FakeServer::for_client(&client, cx).await;
         let mut status = client.status();
         assert!(matches!(
             status.next().await,
@@ -1482,7 +1477,6 @@ mod tests {
     #[gpui::test(iterations = 10)]
     async fn test_connection_timeout(executor: BackgroundExecutor, cx: &mut TestAppContext) {
         init_test(cx);
-        let user_id = 5;
         let client = Client::new(FakeHttpClient::with_404_response());
         let mut status = client.status();
 
@@ -1490,7 +1484,7 @@ mod tests {
         client.override_authenticate(move |cx| {
             cx.background_executor().spawn(async move {
                 Ok(Credentials::User {
-                    user_id,
+                    user_id: 5,
                     access_token: "token".into(),
                 })
             })
@@ -1516,7 +1510,7 @@ mod tests {
         auth_and_connect.await.unwrap_err();
 
         // Allow the connection to be established.
-        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let server = FakeServer::for_client(&client, cx).await;
         assert!(matches!(
             status.next().await,
             Some(Status::Connected { .. })
@@ -1592,9 +1586,8 @@ mod tests {
     #[gpui::test]
     async fn test_subscribing_to_entity(cx: &mut TestAppContext) {
         init_test(cx);
-        let user_id = 5;
         let client = Client::new(FakeHttpClient::with_404_response());
-        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let server = FakeServer::for_client(&client, cx).await;
 
         let (done_tx1, mut done_rx1) = smol::channel::unbounded();
         let (done_tx2, mut done_rx2) = smol::channel::unbounded();
@@ -1646,9 +1639,8 @@ mod tests {
     #[gpui::test]
     async fn test_subscribing_after_dropping_subscription(cx: &mut TestAppContext) {
         init_test(cx);
-        let user_id = 5;
         let client = Client::new(FakeHttpClient::with_404_response());
-        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let server = FakeServer::for_client(&client, cx).await;
 
         let model = cx.new_model(|_| TestModel::default());
         let (done_tx1, _done_rx1) = smol::channel::unbounded();
@@ -1675,9 +1667,8 @@ mod tests {
     #[gpui::test]
     async fn test_dropping_subscription_in_handler(cx: &mut TestAppContext) {
         init_test(cx);
-        let user_id = 5;
         let client = Client::new(FakeHttpClient::with_404_response());
-        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let server = FakeServer::for_client(&client, cx).await;
 
         let model = cx.new_model(|_| TestModel::default());
         let (done_tx, mut done_rx) = smol::channel::unbounded();

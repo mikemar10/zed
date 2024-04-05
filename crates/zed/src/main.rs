@@ -8,7 +8,7 @@ use backtrace::Backtrace;
 use chrono::Utc;
 use clap::{command, Parser};
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{parse_zed_link, Client, ClientSettings, DevServerToken, UserStore};
+use client::{parse_zed_link, Client, ClientSettings, DevServerToken};
 use db::kvp::KEY_VALUE_STORE;
 use editor::Editor;
 use env_logger::Builder;
@@ -139,7 +139,6 @@ fn main() {
 
         language::init(cx);
         languages::init(languages.clone(), node_runtime.clone(), cx);
-        let user_store = cx.new_model(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
         Client::set_global(client.clone(), cx);
@@ -191,7 +190,6 @@ fn main() {
         let app_state = Arc::new(AppState {
             languages: languages.clone(),
             client: client.clone(),
-            user_store: user_store.clone(),
             fs: fs.clone(),
             build_window_options,
             workspace_store,
@@ -216,7 +214,6 @@ fn main() {
         language_selector::init(cx);
         theme_selector::init(cx);
         language_tools::init(cx);
-        notifications::init(app_state.client.clone(), app_state.user_store.clone(), cx);
         markdown_preview::init(cx);
         welcome::init(cx);
         extensions_ui::init(cx);

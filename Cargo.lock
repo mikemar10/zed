@@ -4385,22 +4385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "notifications"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "client",
- "collections",
- "db",
- "gpui",
- "rpc",
- "settings",
- "sum_tree",
- "time",
- "util",
-]
-
-[[package]]
 name = "notify"
 version = "6.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9599,7 +9583,6 @@ dependencies = [
  "menu",
  "mimalloc",
  "node_runtime",
- "notifications",
  "outline",
  "parking_lot",
  "profiling",

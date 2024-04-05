@@ -11,11 +11,11 @@ mod toolbar;
 mod workspace_settings;
 
 use anyhow::{anyhow, Context as _, Result};
-use client::{Client, UserStore};
+use client::Client;
 use collections::{hash_map, HashMap, HashSet};
 use derive_more::{Deref, DerefMut};
 use dock::{Dock, DockPosition, Panel, PanelButtons, PanelHandle};
-use futures::{channel::oneshot, Future, FutureExt, StreamExt};
+use futures::{channel::oneshot, Future, FutureExt};
 use gpui::{
     actions, canvas, impl_actions, point, size, Action, AnyElement, AnyView, AnyWeakView,
     AppContext, AsyncAppContext, Bounds, DevicePixels, DragMoveEvent, Entity as _, EntityId,
@@ -37,7 +37,6 @@ pub use persistence::{
     model::{ItemId, WorkspaceLocation},
     WorkspaceDb, DB as WORKSPACE_DB,
 };
-use postage::stream::Stream;
 use project::{Project, ProjectEntryId, ProjectPath, Worktree, WorktreeId};
 use serde::Deserialize;
 use settings::Settings;
@@ -349,7 +348,6 @@ pub fn register_deserializable_item<I: Item>(cx: &mut AppContext) {
 pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
     pub client: Arc<Client>,
-    pub user_store: Model<UserStore>,
     pub workspace_store: Model<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut AppContext) -> WindowOptions,
@@ -391,7 +389,6 @@ impl AppState {
         let languages = Arc::new(LanguageRegistry::test(cx.background_executor().clone()));
         let http_client = util::http::FakeHttpClient::with_404_response();
         let client = Client::new(http_client.clone());
-        let user_store = cx.new_model(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
         theme::init(theme::LoadThemes::JustBase, cx);
@@ -402,7 +399,6 @@ impl AppState {
             client,
             fs,
             languages,
-            user_store,
             workspace_store,
             node_runtime: FakeNodeRuntime::new(),
             build_window_options: |_, _| Default::default(),
@@ -499,7 +495,6 @@ pub struct Workspace {
     app_state: Arc<AppState>,
     dispatching_keystrokes: Rc<RefCell<Vec<Keystroke>>>,
     _subscriptions: Vec<Subscription>,
-    _observe_current_user: Task<Result<()>>,
     _schedule_serialize: Option<Task<()>>,
     pane_history_timestamp: Arc<AtomicUsize>,
     bounds: Bounds<Pixels>,
@@ -606,20 +601,6 @@ impl Workspace {
             store.workspaces.insert(window_handle);
         });
 
-        let mut current_user = app_state.user_store.read(cx).watch_current_user();
-        let mut connection_status = app_state.client.status();
-        let _observe_current_user = cx.spawn(|this, mut cx| async move {
-            current_user.next().await;
-            connection_status.next().await;
-            let mut stream =
-                Stream::map(current_user, drop).merge(Stream::map(connection_status, drop));
-
-            while stream.recv().await.is_some() {
-                this.update(&mut cx, |_, cx| cx.notify())?;
-            }
-            anyhow::Ok(())
-        });
-
         cx.emit(Event::WorkspaceCreated(weak_handle.clone()));
 
         let left_dock = Dock::new(DockPosition::Left, cx);
@@ -720,7 +701,6 @@ impl Workspace {
             window_edited: false,
             database_id: workspace_id,
             app_state,
-            _observe_current_user,
             _schedule_serialize: None,
             _subscriptions: subscriptions,
             pane_history_timestamp,
@@ -744,7 +724,6 @@ impl Workspace {
         let project_handle = Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             cx,
@@ -884,10 +863,6 @@ impl Workspace {
 
     pub fn app_state(&self) -> &Arc<AppState> {
         &self.app_state
-    }
-
-    pub fn user_store(&self) -> &Model<UserStore> {
-        &self.app_state.user_store
     }
 
     pub fn project(&self) -> &Model<Project> {
@@ -2849,15 +2824,12 @@ impl Workspace {
         use node_runtime::FakeNodeRuntime;
 
         let client = project.read(cx).client();
-        let user_store = project.read(cx).user_store();
-
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
         cx.activate_window();
         let app_state = Arc::new(AppState {
             languages: project.read(cx).languages().clone(),
             workspace_store,
             client,
-            user_store,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: FakeNodeRuntime::new(),

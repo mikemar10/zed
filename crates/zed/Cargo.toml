@@ -52,7 +52,6 @@ markdown_preview.workspace = true
 menu.workspace = true
 mimalloc = "0.1"
 node_runtime.workspace = true
-notifications.workspace = true
 outline.workspace = true
 parking_lot.workspace = true
 profiling.workspace = true

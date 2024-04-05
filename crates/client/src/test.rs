@@ -1,7 +1,7 @@
-use crate::{Client, Connection, Credentials, EstablishConnectionError, UserStore};
+use crate::{Client, Connection, Credentials, EstablishConnectionError};
 use anyhow::{anyhow, Result};
 use futures::{stream::BoxStream, StreamExt};
-use gpui::{BackgroundExecutor, Context, Model, TestAppContext};
+use gpui::{BackgroundExecutor, TestAppContext};
 use parking_lot::Mutex;
 use rpc::{
     proto::{self, GetPrivateUserInfo, GetPrivateUserInfoResponse},
@@ -12,7 +12,6 @@ use std::sync::Arc;
 pub struct FakeServer {
     peer: Arc<Peer>,
     state: Arc<Mutex<FakeServerState>>,
-    user_id: u64,
     executor: BackgroundExecutor,
 }
 
@@ -26,15 +25,10 @@ struct FakeServerState {
 }
 
 impl FakeServer {
-    pub async fn for_client(
-        client_user_id: u64,
-        client: &Arc<Client>,
-        cx: &TestAppContext,
-    ) -> Self {
+    pub async fn for_client(client: &Arc<Client>, cx: &TestAppContext) -> Self {
         let server = Self {
             peer: Peer::new(0),
             state: Default::default(),
-            user_id: client_user_id,
             executor: cx.executor(),
         };
 
@@ -49,7 +43,7 @@ impl FakeServer {
                         state.auth_count += 1;
                         let access_token = state.access_token.to_string();
                         Ok(Credentials::User {
-                            user_id: client_user_id,
+                            user_id: 5,
                             access_token,
                         })
                     })
@@ -73,7 +67,7 @@ impl FakeServer {
 
                         if credentials
                             != (Credentials::User {
-                                user_id: client_user_id,
+                                user_id: 5,
                                 access_token: state.lock().access_token.to_string(),
                             })
                         {
@@ -190,23 +184,6 @@ impl FakeServer {
 
     fn connection_id(&self) -> ConnectionId {
         self.state.lock().connection_id.expect("not connected")
-    }
-
-    pub async fn build_user_store(
-        &self,
-        client: Arc<Client>,
-        cx: &mut TestAppContext,
-    ) -> Model<UserStore> {
-        let user_store = cx.new_model(|cx| UserStore::new(client, cx));
-        assert_eq!(
-            self.receive::<proto::GetUsers>()
-                .await
-                .unwrap()
-                .payload
-                .user_ids,
-            &[self.user_id]
-        );
-        user_store
     }
 }
 

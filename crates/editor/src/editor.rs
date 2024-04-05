@@ -42,7 +42,6 @@ pub(crate) use actions::*;
 use aho_corasick::AhoCorasick;
 use anyhow::{anyhow, Context as _, Result};
 use blink_manager::BlinkManager;
-use client::{Collaborator, ParticipantIndex};
 use clock::ReplicaId;
 use collections::{hash_map, BTreeMap, Bound, HashMap, HashSet, VecDeque};
 use convert_case::{Case, Casing};
@@ -95,7 +94,6 @@ use project::project_settings::{GitGutterSetting, ProjectSettings};
 use project::Item;
 use project::{FormatTrigger, Location, Project, ProjectPath, ProjectTransaction};
 use rand::prelude::*;
-use rpc::proto::*;
 use scroll::{Autoscroll, OngoingScroll, ScrollAnchor, ScrollManager, ScrollbarAutoHide};
 use selections_collection::{resolve_multiple, MutableSelectionsCollection, SelectionsCollection};
 use serde::{Deserialize, Serialize};
@@ -376,7 +374,6 @@ pub struct Editor {
     soft_wrap_mode_override: Option<language_settings::SoftWrap>,
     project: Option<Model<Project>>,
     completion_provider: Option<Box<dyn CompletionProvider>>,
-    collaboration_hub: Option<Box<dyn CollaborationHub>>,
     blink_manager: Model<BlinkManager>,
     pub show_local_selections: bool,
     mode: EditorMode,
@@ -1399,7 +1396,6 @@ impl Editor {
             active_diagnostics: None,
             soft_wrap_mode_override,
             completion_provider: project.clone().map(|project| Box::new(project) as _),
-            collaboration_hub: project.clone().map(|project| Box::new(project) as _),
             project,
             blink_manager: blink_manager.clone(),
             show_local_selections: true,
@@ -1616,14 +1612,6 @@ impl Editor {
 
     pub fn mode(&self) -> EditorMode {
         self.mode
-    }
-
-    pub fn collaboration_hub(&self) -> Option<&dyn CollaborationHub> {
-        self.collaboration_hub.as_deref()
-    }
-
-    pub fn set_collaboration_hub(&mut self, hub: Box<dyn CollaborationHub>) {
-        self.collaboration_hub = Some(hub);
     }
 
     pub fn set_custom_context_menu(
@@ -9644,36 +9632,6 @@ impl Editor {
             })
         }));
         self
-    }
-}
-
-pub trait CollaborationHub {
-    fn collaborators<'a>(&self, cx: &'a AppContext) -> &'a HashMap<PeerId, Collaborator>;
-    fn user_participant_indices<'a>(
-        &self,
-        cx: &'a AppContext,
-    ) -> &'a HashMap<u64, ParticipantIndex>;
-    fn user_names(&self, cx: &AppContext) -> HashMap<u64, SharedString>;
-}
-
-impl CollaborationHub for Model<Project> {
-    fn collaborators<'a>(&self, cx: &'a AppContext) -> &'a HashMap<PeerId, Collaborator> {
-        self.read(cx).collaborators()
-    }
-
-    fn user_participant_indices<'a>(
-        &self,
-        cx: &'a AppContext,
-    ) -> &'a HashMap<u64, ParticipantIndex> {
-        self.read(cx).user_store().read(cx).participant_indices()
-    }
-
-    fn user_names(&self, cx: &AppContext) -> HashMap<u64, SharedString> {
-        let this = self.read(cx);
-        let user_ids = this.collaborators().values().map(|c| c.user_id);
-        this.user_store().read_with(cx, |user_store, cx| {
-            user_store.participant_names(user_ids, cx)
-        })
     }
 }
 
