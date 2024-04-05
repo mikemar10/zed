@@ -3,15 +3,11 @@ members = [
     "crates/activity_indicator",
     "crates/assets",
     "crates/assistant",
-    "crates/audio",
     "crates/breadcrumbs",
-    "crates/call",
     "crates/channel",
     "crates/cli",
     "crates/client",
     "crates/clock",
-    "crates/collab",
-    "crates/collab_ui",
     "crates/collections",
     "crates/command_palette",
     "crates/command_palette_hooks",
@@ -40,8 +36,6 @@ members = [
     "crates/language_selector",
     "crates/language_tools",
     "crates/languages",
-    "crates/live_kit_client",
-    "crates/live_kit_server",
     "crates/lsp",
     "crates/markdown_preview",
     "crates/media",
@@ -109,16 +103,12 @@ activity_indicator = { path = "crates/activity_indicator" }
 ai = { path = "crates/ai" }
 assets = { path = "crates/assets" }
 assistant = { path = "crates/assistant" }
-audio = { path = "crates/audio" }
 base64 = "0.13"
 breadcrumbs = { path = "crates/breadcrumbs" }
-call = { path = "crates/call" }
 channel = { path = "crates/channel" }
 cli = { path = "crates/cli" }
 client = { path = "crates/client" }
 clock = { path = "crates/clock" }
-collab = { path = "crates/collab" }
-collab_ui = { path = "crates/collab_ui" }
 collections = { path = "crates/collections" }
 color = { path = "crates/color" }
 command_palette = { path = "crates/command_palette" }
@@ -146,8 +136,6 @@ language = { path = "crates/language" }
 language_selector = { path = "crates/language_selector" }
 language_tools = { path = "crates/language_tools" }
 languages = { path = "crates/languages" }
-live_kit_client = { path = "crates/live_kit_client" }
-live_kit_server = { path = "crates/live_kit_server" }
 lsp = { path = "crates/lsp" }
 markdown_preview = { path = "crates/markdown_preview" }
 media = { path = "crates/media" }

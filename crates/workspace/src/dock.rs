@@ -230,7 +230,6 @@ impl Dock {
                     workspace.zoomed_position = None;
                 }
                 workspace.dismiss_zoomed_items_to_reveal(Some(position), cx);
-                workspace.update_active_view_for_followers(cx)
             }
         })
         .detach();

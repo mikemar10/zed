@@ -215,13 +215,11 @@ impl Vim {
         self.editor_subscription = Some(cx.subscribe(&editor, |editor, event, cx| match event {
             EditorEvent::SelectionsChanged { local: true } => {
                 let editor = editor.read(cx);
-                if editor.leader_peer_id().is_none() {
-                    let newest = editor.selections.newest_anchor().clone();
-                    let is_multicursor = editor.selections.count() > 1;
-                    Vim::update(cx, |vim, cx| {
-                        vim.local_selections_changed(newest, is_multicursor, cx);
-                    })
-                }
+                let newest = editor.selections.newest_anchor().clone();
+                let is_multicursor = editor.selections.count() > 1;
+                Vim::update(cx, |vim, cx| {
+                    vim.local_selections_changed(newest, is_multicursor, cx);
+                })
             }
             EditorEvent::InputIgnored { text } => {
                 Vim::active_editor_input_ignored(text.clone(), cx);
@@ -245,10 +243,9 @@ impl Vim {
         let newest_selection_empty = editor.selections.newest::<usize>(cx).is_empty();
 
         if editor_mode == EditorMode::Full
-                && !newest_selection_empty
-                && self.state().mode == Mode::Normal
-                // When following someone, don't switch vim mode.
-                && editor.leader_peer_id().is_none()
+            && !newest_selection_empty
+            && self.state().mode == Mode::Normal
+        // When following someone, don't switch vim mode.
         {
             self.switch_mode(Mode::Visual, true, cx);
         }

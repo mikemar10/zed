@@ -396,23 +396,6 @@ impl Editor {
             .set_anchor(scroll_anchor, top_row, true, false, workspace_id, cx);
     }
 
-    pub(crate) fn set_scroll_anchor_remote(
-        &mut self,
-        scroll_anchor: ScrollAnchor,
-        cx: &mut ViewContext<Self>,
-    ) {
-        hide_hover(self, cx);
-        let workspace_id = self.workspace.as_ref().map(|workspace| workspace.1);
-        let snapshot = &self.buffer().read(cx).snapshot(cx);
-        if !scroll_anchor.anchor.is_valid(snapshot) {
-            log::warn!("Invalid scroll anchor: {:?}", scroll_anchor);
-            return;
-        }
-        let top_row = scroll_anchor.anchor.to_point(snapshot).row;
-        self.scroll_manager
-            .set_anchor(scroll_anchor, top_row, false, false, workspace_id, cx);
-    }
-
     pub fn scroll_screen(&mut self, amount: &ScrollAmount, cx: &mut ViewContext<Self>) {
         if matches!(self.mode, EditorMode::SingleLine) {
             cx.propagate();

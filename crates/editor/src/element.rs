@@ -13,8 +13,8 @@ use crate::{
     scroll::scroll_amount::ScrollAmount,
     CursorShape, DisplayPoint, DocumentHighlightRead, DocumentHighlightWrite, Editor, EditorMode,
     EditorSettings, EditorSnapshot, EditorStyle, GutterDimensions, HalfPageDown, HalfPageUp,
-    HoveredCursor, LineDown, LineUp, OpenExcerpts, PageDown, PageUp, Point, SelectPhase, Selection,
-    SoftWrap, ToPoint, CURSORS_VISIBLE_FOR, MAX_LINE_LEN,
+    LineDown, LineUp, OpenExcerpts, PageDown, PageUp, Point, SelectPhase, Selection, SoftWrap,
+    ToPoint, MAX_LINE_LEN,
 };
 use anyhow::Result;
 use collections::{BTreeMap, HashMap};
@@ -351,7 +351,6 @@ impl EditorElement {
         register_action(view, cx, Editor::context_menu_prev);
         register_action(view, cx, Editor::context_menu_next);
         register_action(view, cx, Editor::context_menu_last);
-        register_action(view, cx, Editor::display_cursor_names);
         register_action(view, cx, Editor::unique_lines_case_insensitive);
         register_action(view, cx, Editor::unique_lines_case_sensitive);
         register_action(view, cx, Editor::accept_partial_inline_completion);
@@ -588,7 +587,6 @@ impl EditorElement {
 
             if let Some(point) = point_for_position.as_valid() {
                 hover_at(editor, Some(point), cx);
-                Self::update_visible_cursor(editor, point, position_map, cx);
             } else {
                 hover_at(editor, None, cx);
             }
@@ -599,51 +597,6 @@ impl EditorElement {
                 cx.stop_propagation();
             }
         }
-    }
-
-    fn update_visible_cursor(
-        editor: &mut Editor,
-        point: DisplayPoint,
-        position_map: &PositionMap,
-        cx: &mut ViewContext<Editor>,
-    ) {
-        let snapshot = &position_map.snapshot;
-        let Some(hub) = editor.collaboration_hub() else {
-            return;
-        };
-        let range = DisplayPoint::new(point.row(), point.column().saturating_sub(1))
-            ..DisplayPoint::new(
-                point.row(),
-                (point.column() + 1).min(snapshot.line_len(point.row())),
-            );
-
-        let range = snapshot
-            .buffer_snapshot
-            .anchor_at(range.start.to_point(&snapshot.display_snapshot), Bias::Left)
-            ..snapshot
-                .buffer_snapshot
-                .anchor_at(range.end.to_point(&snapshot.display_snapshot), Bias::Right);
-
-        let Some(selection) = snapshot.remote_selections_in_range(&range, hub, cx).next() else {
-            return;
-        };
-        let key = crate::HoveredCursor {
-            replica_id: selection.replica_id,
-            selection_id: selection.selection.id,
-        };
-        editor.hovered_cursors.insert(
-            key.clone(),
-            cx.spawn(|editor, mut cx| async move {
-                cx.background_executor().timer(CURSORS_VISIBLE_FOR).await;
-                editor
-                    .update(&mut cx, |editor, cx| {
-                        editor.hovered_cursors.remove(&key);
-                        cx.notify();
-                    })
-                    .ok();
-            }),
-        );
-        cx.notify()
     }
 
     fn layout_selections(
@@ -681,7 +634,7 @@ impl EditorElement {
                     editor.cursor_shape,
                     &snapshot.display_snapshot,
                     is_newest,
-                    editor.leader_peer_id.is_none(),
+                    true,
                     None,
                 );
                 if is_newest {
@@ -706,68 +659,6 @@ impl EditorElement {
             selections.push((player, layouts));
         }
 
-        if let Some(collaboration_hub) = &editor.collaboration_hub {
-            // When following someone, render the local selections in their color.
-            if let Some(leader_id) = editor.leader_peer_id {
-                if let Some(collaborator) = collaboration_hub.collaborators(cx).get(&leader_id) {
-                    if let Some(participant_index) = collaboration_hub
-                        .user_participant_indices(cx)
-                        .get(&collaborator.user_id)
-                    {
-                        if let Some((local_selection_style, _)) = selections.first_mut() {
-                            *local_selection_style = cx
-                                .theme()
-                                .players()
-                                .color_for_participant(participant_index.0);
-                        }
-                    }
-                }
-            }
-
-            let mut remote_selections = HashMap::default();
-            for selection in snapshot.remote_selections_in_range(
-                &(start_anchor..end_anchor),
-                collaboration_hub.as_ref(),
-                cx,
-            ) {
-                let selection_style = if let Some(participant_index) = selection.participant_index {
-                    cx.theme()
-                        .players()
-                        .color_for_participant(participant_index.0)
-                } else {
-                    cx.theme().players().absent()
-                };
-
-                // Don't re-render the leader's selections, since the local selections
-                // match theirs.
-                if Some(selection.peer_id) == editor.leader_peer_id {
-                    continue;
-                }
-                let key = HoveredCursor {
-                    replica_id: selection.replica_id,
-                    selection_id: selection.selection.id,
-                };
-
-                let is_shown =
-                    editor.show_cursor_names || editor.hovered_cursors.contains_key(&key);
-
-                remote_selections
-                    .entry(selection.replica_id)
-                    .or_insert((selection_style, Vec::new()))
-                    .1
-                    .push(SelectionLayout::new(
-                        selection.selection,
-                        selection.line_mode,
-                        selection.cursor_shape,
-                        &snapshot.display_snapshot,
-                        false,
-                        false,
-                        if is_shown { selection.user_name } else { None },
-                    ));
-            }
-
-            selections.extend(remote_selections.into_values());
-        }
         (selections, active_rows, newest_selection_head)
     }
 

@@ -3,15 +3,9 @@ use crate::{
     persistence::model::ItemId,
     searchable::SearchableItemHandle,
     workspace_settings::{AutosaveSetting, WorkspaceSettings},
-    DelayedDebouncedEditAction, FollowableItemBuilders, ItemNavHistory, ToolbarItemLocation,
-    ViewId, Workspace, WorkspaceId,
+    DelayedDebouncedEditAction, ItemNavHistory, ToolbarItemLocation, Workspace, WorkspaceId,
 };
 use anyhow::Result;
-use client::{
-    proto::{self, PeerId},
-    Client,
-};
-use futures::{channel::mpsc, StreamExt};
 use gpui::{
     AnyElement, AnyView, AppContext, Entity, EntityId, EventEmitter, FocusHandle, FocusableView,
     HighlightStyle, Model, Pixels, Point, SharedString, Task, View, ViewContext, WeakView,
@@ -24,11 +18,8 @@ use settings::Settings;
 use smallvec::SmallVec;
 use std::{
     any::{Any, TypeId},
-    cell::RefCell,
     ops::Range,
     path::PathBuf,
-    rc::Rc,
-    sync::Arc,
     time::Duration,
 };
 use theme::Theme;
@@ -281,7 +272,6 @@ pub trait ItemHandle: 'static + Send {
     ) -> Task<Result<()>>;
     fn reload(&self, project: Model<Project>, cx: &mut WindowContext) -> Task<Result<()>>;
     fn act_as_type(&self, type_id: TypeId, cx: &AppContext) -> Option<AnyView>;
-    fn to_followable_item_handle(&self, cx: &AppContext) -> Option<Box<dyn FollowableItemHandle>>;
     fn on_release(
         &self,
         cx: &mut AppContext,
@@ -409,69 +399,12 @@ impl<T: Item> ItemHandle for View<T> {
             this.added_to_workspace(workspace, cx);
         });
 
-        if let Some(followed_item) = self.to_followable_item_handle(cx) {
-            if let Some(message) = followed_item.to_state_proto(cx) {
-                workspace.update_followers(
-                    followed_item.is_project_item(cx),
-                    proto::update_followers::Variant::CreateView(proto::View {
-                        id: followed_item
-                            .remote_id(&workspace.client(), cx)
-                            .map(|id| id.to_proto()),
-                        variant: Some(message),
-                        leader_id: workspace.leader_for_pane(&pane),
-                    }),
-                    cx,
-                );
-            }
-        }
-
         if workspace
             .panes_by_item
             .insert(self.item_id(), pane.downgrade())
             .is_none()
         {
             let mut pending_autosave = DelayedDebouncedEditAction::new();
-            let (pending_update_tx, mut pending_update_rx) = mpsc::unbounded();
-            let pending_update = Rc::new(RefCell::new(None));
-
-            let mut send_follower_updates = None;
-            if let Some(item) = self.to_followable_item_handle(cx) {
-                let is_project_item = item.is_project_item(cx);
-                let item = item.downgrade();
-
-                send_follower_updates = Some(cx.spawn({
-                    let pending_update = pending_update.clone();
-                    |workspace, mut cx| async move {
-                        while let Some(mut leader_id) = pending_update_rx.next().await {
-                            while let Ok(Some(id)) = pending_update_rx.try_next() {
-                                leader_id = id;
-                            }
-
-                            workspace.update(&mut cx, |workspace, cx| {
-                                let item = item.upgrade().expect(
-                                    "item to be alive, otherwise task would have been dropped",
-                                );
-                                workspace.update_followers(
-                                    is_project_item,
-                                    proto::update_followers::Variant::UpdateView(
-                                        proto::UpdateView {
-                                            id: item
-                                                .remote_id(workspace.client(), cx)
-                                                .map(|id| id.to_proto()),
-                                            variant: pending_update.borrow_mut().take(),
-                                            leader_id,
-                                        },
-                                    ),
-                                    cx,
-                                );
-                            })?;
-                            cx.background_executor().timer(LEADER_UPDATE_THROTTLE).await;
-                        }
-                        anyhow::Ok(())
-                    }
-                }));
-            }
-
             let mut event_subscription =
                 Some(cx.subscribe(self, move |workspace, item, event, cx| {
                     let pane = if let Some(pane) = workspace
@@ -484,25 +417,6 @@ impl<T: Item> ItemHandle for View<T> {
                         log::error!("unexpected item event after pane was dropped");
                         return;
                     };
-
-                    if let Some(item) = item.to_followable_item_handle(cx) {
-                        let leader_id = workspace.leader_for_pane(&pane);
-                        let follow_event = item.to_follow_event(event);
-                        if leader_id.is_some()
-                            && matches!(follow_event, Some(FollowEvent::Unfollow))
-                        {
-                            workspace.unfollow(&pane, cx);
-                        }
-
-                        if item.focus_handle(cx).contains_focused(cx) {
-                            item.add_event_to_update_proto(
-                                event,
-                                &mut pending_update.borrow_mut(),
-                                cx,
-                            );
-                            pending_update_tx.unbounded_send(leader_id).ok();
-                        }
-                    }
 
                     T::to_item_events(event, |event| match event {
                         ItemEvent::CloseItem => {
@@ -549,7 +463,6 @@ impl<T: Item> ItemHandle for View<T> {
             cx.observe_release(self, move |workspace, _, _| {
                 workspace.panes_by_item.remove(&item_id);
                 event_subscription.take();
-                send_follower_updates.take();
             })
             .detach();
         }
@@ -615,12 +528,6 @@ impl<T: Item> ItemHandle for View<T> {
 
     fn act_as_type<'a>(&'a self, type_id: TypeId, cx: &'a AppContext) -> Option<AnyView> {
         self.read(cx).act_as_type(type_id, self, cx)
-    }
-
-    fn to_followable_item_handle(&self, cx: &AppContext) -> Option<Box<dyn FollowableItemHandle>> {
-        let builders = cx.try_global::<FollowableItemBuilders>()?;
-        let item = self.to_any();
-        Some(builders.get(&item.entity_type())?.1(&item))
     }
 
     fn on_release(
@@ -694,122 +601,6 @@ pub trait ProjectItem: Item {
     ) -> Self
     where
         Self: Sized;
-}
-
-#[derive(Debug)]
-pub enum FollowEvent {
-    Unfollow,
-}
-
-pub trait FollowableItem: Item {
-    fn remote_id(&self) -> Option<ViewId>;
-    fn to_state_proto(&self, cx: &WindowContext) -> Option<proto::view::Variant>;
-    fn from_state_proto(
-        pane: View<Pane>,
-        project: View<Workspace>,
-        id: ViewId,
-        state: &mut Option<proto::view::Variant>,
-        cx: &mut WindowContext,
-    ) -> Option<Task<Result<View<Self>>>>;
-    fn to_follow_event(event: &Self::Event) -> Option<FollowEvent>;
-    fn add_event_to_update_proto(
-        &self,
-        event: &Self::Event,
-        update: &mut Option<proto::update_view::Variant>,
-        cx: &WindowContext,
-    ) -> bool;
-    fn apply_update_proto(
-        &mut self,
-        project: &Model<Project>,
-        message: proto::update_view::Variant,
-        cx: &mut ViewContext<Self>,
-    ) -> Task<Result<()>>;
-    fn is_project_item(&self, cx: &WindowContext) -> bool;
-    fn set_leader_peer_id(&mut self, leader_peer_id: Option<PeerId>, cx: &mut ViewContext<Self>);
-}
-
-pub trait FollowableItemHandle: ItemHandle {
-    fn remote_id(&self, client: &Arc<Client>, cx: &WindowContext) -> Option<ViewId>;
-    fn downgrade(&self) -> Box<dyn WeakFollowableItemHandle>;
-    fn set_leader_peer_id(&self, leader_peer_id: Option<PeerId>, cx: &mut WindowContext);
-    fn to_state_proto(&self, cx: &WindowContext) -> Option<proto::view::Variant>;
-    fn add_event_to_update_proto(
-        &self,
-        event: &dyn Any,
-        update: &mut Option<proto::update_view::Variant>,
-        cx: &WindowContext,
-    ) -> bool;
-    fn to_follow_event(&self, event: &dyn Any) -> Option<FollowEvent>;
-    fn apply_update_proto(
-        &self,
-        project: &Model<Project>,
-        message: proto::update_view::Variant,
-        cx: &mut WindowContext,
-    ) -> Task<Result<()>>;
-    fn is_project_item(&self, cx: &WindowContext) -> bool;
-}
-
-impl<T: FollowableItem> FollowableItemHandle for View<T> {
-    fn remote_id(&self, client: &Arc<Client>, cx: &WindowContext) -> Option<ViewId> {
-        self.read(cx).remote_id().or_else(|| {
-            client.peer_id().map(|creator| ViewId {
-                creator,
-                id: self.item_id().as_u64(),
-            })
-        })
-    }
-
-    fn downgrade(&self) -> Box<dyn WeakFollowableItemHandle> {
-        Box::new(self.downgrade())
-    }
-
-    fn set_leader_peer_id(&self, leader_peer_id: Option<PeerId>, cx: &mut WindowContext) {
-        self.update(cx, |this, cx| this.set_leader_peer_id(leader_peer_id, cx))
-    }
-
-    fn to_state_proto(&self, cx: &WindowContext) -> Option<proto::view::Variant> {
-        self.read(cx).to_state_proto(cx)
-    }
-
-    fn add_event_to_update_proto(
-        &self,
-        event: &dyn Any,
-        update: &mut Option<proto::update_view::Variant>,
-        cx: &WindowContext,
-    ) -> bool {
-        if let Some(event) = event.downcast_ref() {
-            self.read(cx).add_event_to_update_proto(event, update, cx)
-        } else {
-            false
-        }
-    }
-
-    fn to_follow_event(&self, event: &dyn Any) -> Option<FollowEvent> {
-        T::to_follow_event(event.downcast_ref()?)
-    }
-
-    fn apply_update_proto(
-        &self,
-        project: &Model<Project>,
-        message: proto::update_view::Variant,
-        cx: &mut WindowContext,
-    ) -> Task<Result<()>> {
-        self.update(cx, |this, cx| this.apply_update_proto(project, message, cx))
-    }
-
-    fn is_project_item(&self, cx: &WindowContext) -> bool {
-        self.read(cx).is_project_item(cx)
-    }
-}
-
-pub trait WeakFollowableItemHandle: Send + Sync {
-    fn upgrade(&self) -> Option<Box<dyn FollowableItemHandle>>;
-}
-
-impl<T: FollowableItem> WeakFollowableItemHandle for WeakView<T> {
-    fn upgrade(&self) -> Option<Box<dyn FollowableItemHandle>> {
-        Some(Box::new(self.upgrade()?))
-    }
 }
 
 #[cfg(any(test, feature = "test-support"))]

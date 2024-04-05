@@ -266,7 +266,7 @@ impl PickerDelegate for RecentProjectsDelegate {
                             cx.spawn(move |workspace, mut cx| async move {
                                 let continue_replacing = workspace
                                     .update(&mut cx, |workspace, cx| {
-                                        workspace.prepare_to_close(true, cx)
+                                        workspace.prepare_to_close(cx)
                                     })?
                                     .await?;
                                 if continue_replacing {

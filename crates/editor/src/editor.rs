@@ -125,9 +125,7 @@ use ui::{
 };
 use util::{maybe, post_inc, RangeExt, ResultExt, TryFutureExt};
 use workspace::Toast;
-use workspace::{
-    searchable::SearchEvent, ItemNavHistory, SplitDirection, ViewId, Workspace, WorkspaceId,
-};
+use workspace::{searchable::SearchEvent, ItemNavHistory, SplitDirection, Workspace, WorkspaceId};
 
 use crate::hover_links::find_url;
 
@@ -135,7 +133,6 @@ const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 const MAX_LINE_LEN: usize = 1024;
 const MIN_NAVIGATION_HISTORY_ROW_DELTA: i64 = 10;
 const MAX_SELECTION_HISTORY_LEN: usize = 1024;
-pub(crate) const CURSORS_VISIBLE_FOR: Duration = Duration::from_millis(2000);
 #[doc(hidden)]
 pub const CODE_ACTIONS_DEBOUNCE_TIMEOUT: Duration = Duration::from_millis(250);
 #[doc(hidden)]
@@ -239,7 +236,6 @@ pub fn init(cx: &mut AppContext) {
     init_settings(cx);
 
     workspace::register_project_item::<Editor>(cx);
-    workspace::register_followable_item::<Editor>(cx);
     workspace::register_deserializable_item::<Editor>(cx);
     cx.observe_new_views(
         |workspace: &mut Workspace, _cx: &mut ViewContext<Workspace>| {
@@ -382,8 +378,6 @@ pub struct Editor {
     completion_provider: Option<Box<dyn CompletionProvider>>,
     collaboration_hub: Option<Box<dyn CollaborationHub>>,
     blink_manager: Model<BlinkManager>,
-    show_cursor_names: bool,
-    hovered_cursors: HashMap<HoveredCursor, Task<()>>,
     pub show_local_selections: bool,
     mode: EditorMode,
     show_breadcrumbs: bool,
@@ -413,8 +407,6 @@ pub struct Editor {
     input_enabled: bool,
     use_modal_editing: bool,
     read_only: bool,
-    leader_peer_id: Option<PeerId>,
-    remote_id: Option<ViewId>,
     hover_state: HoverState,
     gutter_hovered: bool,
     hovered_link_state: Option<HoveredLinkState>,
@@ -465,17 +457,6 @@ impl Default for GutterDimensions {
             margin: Pixels::ZERO,
         }
     }
-}
-
-#[derive(Debug)]
-pub struct RemoteSelection {
-    pub replica_id: ReplicaId,
-    pub selection: Selection<Anchor>,
-    pub cursor_shape: CursorShape,
-    pub peer_id: PeerId,
-    pub line_mode: bool,
-    pub participant_index: Option<ParticipantIndex>,
-    pub user_name: Option<SharedString>,
 }
 
 #[derive(Clone, Debug)]
@@ -1453,8 +1434,6 @@ impl Editor {
             read_only: false,
             use_autoclose: true,
             auto_replace_emoji_shortcode: false,
-            leader_peer_id: None,
-            remote_id: None,
             hover_state: Default::default(),
             hovered_link_state: Default::default(),
             inline_completion_provider: None,
@@ -1464,8 +1443,6 @@ impl Editor {
             pixel_position_of_newest_cursor: None,
             gutter_width: Default::default(),
             style: None,
-            show_cursor_names: false,
-            hovered_cursors: Default::default(),
             editor_actions: Default::default(),
             vim_replace_map: Default::default(),
             show_inline_completions: mode == EditorMode::Full,
@@ -1589,18 +1566,13 @@ impl Editor {
         }
     }
 
-    pub fn replica_id(&self, cx: &AppContext) -> ReplicaId {
-        self.buffer.read(cx).replica_id()
-    }
-
-    pub fn leader_peer_id(&self) -> Option<PeerId> {
-        self.leader_peer_id
-    }
-
     pub fn buffer(&self) -> &Model<MultiBuffer> {
         &self.buffer
     }
 
+    pub fn replica_id(&self, cx: &AppContext) -> ReplicaId {
+        self.buffer.read(cx).replica_id()
+    }
     pub fn workspace(&self) -> Option<View<Workspace>> {
         self.workspace.as_ref()?.0.upgrade()
     }
@@ -1782,7 +1754,7 @@ impl Editor {
         old_cursor_position: &Anchor,
         cx: &mut ViewContext<Self>,
     ) {
-        if self.focus_handle.is_focused(cx) && self.leader_peer_id.is_none() {
+        if self.focus_handle.is_focused(cx) {
             self.buffer.update(cx, |buffer, cx| {
                 buffer.set_active_selections(
                     &self.selections.disjoint_anchors(),
@@ -3901,24 +3873,6 @@ impl Editor {
         }
 
         self.update_visible_inline_completion(cx);
-    }
-
-    pub fn display_cursor_names(&mut self, _: &DisplayCursorNames, cx: &mut ViewContext<Self>) {
-        self.show_cursor_names(cx);
-    }
-
-    fn show_cursor_names(&mut self, cx: &mut ViewContext<Self>) {
-        self.show_cursor_names = true;
-        cx.notify();
-        cx.spawn(|this, mut cx| async move {
-            cx.background_executor().timer(CURSORS_VISIBLE_FOR).await;
-            this.update(&mut cx, |this, cx| {
-                this.show_cursor_names = false;
-                cx.notify()
-            })
-            .ok()
-        })
-        .detach();
     }
 
     pub fn next_inline_completion(&mut self, _: &NextInlineCompletion, cx: &mut ViewContext<Self>) {
@@ -9650,17 +9604,14 @@ impl Editor {
             cx.focus(&rename_editor_focus_handle);
         } else {
             self.blink_manager.update(cx, BlinkManager::enable);
-            self.show_cursor_names(cx);
             self.buffer.update(cx, |buffer, cx| {
                 buffer.finalize_last_transaction(cx);
-                if self.leader_peer_id.is_none() {
-                    buffer.set_active_selections(
-                        &self.selections.disjoint_anchors(),
-                        self.selections.line_mode,
-                        self.cursor_shape,
-                        cx,
-                    );
-                }
+                buffer.set_active_selections(
+                    &self.selections.disjoint_anchors(),
+                    self.selections.line_mode,
+                    self.cursor_shape,
+                    cx,
+                );
             });
         }
     }
@@ -9829,37 +9780,6 @@ fn ending_row(next_selection: &Selection<Point>, display_map: &DisplaySnapshot) 
 }
 
 impl EditorSnapshot {
-    pub fn remote_selections_in_range<'a>(
-        &'a self,
-        range: &'a Range<Anchor>,
-        collaboration_hub: &dyn CollaborationHub,
-        cx: &'a AppContext,
-    ) -> impl 'a + Iterator<Item = RemoteSelection> {
-        let participant_names = collaboration_hub.user_names(cx);
-        let participant_indices = collaboration_hub.user_participant_indices(cx);
-        let collaborators_by_peer_id = collaboration_hub.collaborators(cx);
-        let collaborators_by_replica_id = collaborators_by_peer_id
-            .iter()
-            .map(|(_, collaborator)| (collaborator.replica_id, collaborator))
-            .collect::<HashMap<_, _>>();
-        self.buffer_snapshot
-            .remote_selections_in_range(range)
-            .filter_map(move |(replica_id, line_mode, cursor_shape, selection)| {
-                let collaborator = collaborators_by_replica_id.get(&replica_id)?;
-                let participant_index = participant_indices.get(&collaborator.user_id).copied();
-                let user_name = participant_names.get(&collaborator.user_id).cloned();
-                Some(RemoteSelection {
-                    replica_id,
-                    selection,
-                    cursor_shape,
-                    line_mode,
-                    participant_index,
-                    peer_id: collaborator.peer_id,
-                    user_name,
-                })
-            })
-    }
-
     pub fn language_at<T: ToOffset>(&self, position: T) -> Option<&Arc<Language>> {
         self.display_snapshot.buffer_snapshot.language_at(position)
     }

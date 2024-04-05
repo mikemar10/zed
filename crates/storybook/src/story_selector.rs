@@ -16,7 +16,6 @@ pub enum ComponentStory {
     Avatar,
     Button,
     Checkbox,
-    CollabNotification,
     ContextMenu,
     Cursor,
     Disclosure,
@@ -46,9 +45,6 @@ impl ComponentStory {
             Self::Avatar => cx.new_view(|_| ui::AvatarStory).into(),
             Self::Button => cx.new_view(|_| ui::ButtonStory).into(),
             Self::Checkbox => cx.new_view(|_| ui::CheckboxStory).into(),
-            Self::CollabNotification => cx
-                .new_view(|_| collab_ui::notifications::CollabNotificationStory)
-                .into(),
             Self::ContextMenu => cx.new_view(|_| ui::ContextMenuStory).into(),
             Self::Cursor => cx.new_view(|_| crate::stories::CursorStory).into(),
             Self::Disclosure => cx.new_view(|_| ui::DisclosureStory).into(),

@@ -255,13 +255,4 @@ impl Editor {
         self.scroll_manager.autoscroll_request = Some((autoscroll, true));
         cx.notify();
     }
-
-    pub(crate) fn request_autoscroll_remotely(
-        &mut self,
-        autoscroll: Autoscroll,
-        cx: &mut ViewContext<Self>,
-    ) {
-        self.scroll_manager.autoscroll_request = Some((autoscroll, false));
-        cx.notify();
-    }
 }
