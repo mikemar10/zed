@@ -1,4 +1,3 @@
-pub mod events;
 pub mod extensions;
 pub mod ips_file;
 pub mod slack;

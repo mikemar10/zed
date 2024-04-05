@@ -1,5 +1,4 @@
 use anyhow::Result;
-use call::report_call_event_for_channel;
 use channel::{Channel, ChannelBuffer, ChannelBufferEvent, ChannelStore};
 use client::{
     proto::{self, PeerId},
@@ -64,12 +63,6 @@ impl ChannelView {
         cx.spawn(|mut cx| async move {
             let channel_view = channel_view.await?;
             pane.update(&mut cx, |pane, cx| {
-                report_call_event_for_channel(
-                    "open channel notes",
-                    channel_id,
-                    &workspace.read(cx).app_state().client,
-                    cx,
-                );
                 pane.add_item(Box::new(channel_view.clone()), true, true, None, cx);
             })?;
             anyhow::Ok(channel_view)
@@ -385,10 +378,6 @@ impl Item for ChannelView {
                 Color::Muted
             })
             .into_any_element()
-    }
-
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        None
     }
 
     fn clone_on_split(&self, _: WorkspaceId, cx: &mut ViewContext<Self>) -> Option<View<Self>> {

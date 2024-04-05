@@ -107,7 +107,6 @@ async fn main() -> Result<()> {
                         .route("/", get(handle_root))
                         .route("/healthz", get(handle_liveness_probe))
                         .merge(collab::api::extensions::router())
-                        .merge(collab::api::events::router())
                         .layer(Extension(state.clone())),
                 )
                 .layer(

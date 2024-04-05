@@ -10,7 +10,7 @@ use crate::{extension_lsp_adapter::ExtensionLspAdapter, wasm_host::wit};
 use anyhow::{anyhow, bail, Context as _, Result};
 use async_compression::futures::bufread::GzipDecoder;
 use async_tar::Archive;
-use client::{telemetry::Telemetry, Client, ExtensionMetadata, GetExtensionsResponse};
+use client::{Client, ExtensionMetadata, GetExtensionsResponse};
 use collections::{hash_map, BTreeMap, HashMap, HashSet};
 use extension_builder::{CompileExtensionOptions, ExtensionBuilder};
 use fs::{Fs, RemoveOptions};
@@ -59,7 +59,6 @@ pub struct ExtensionStore {
     extension_index: ExtensionIndex,
     fs: Arc<dyn Fs>,
     http_client: Arc<HttpClientWithUrl>,
-    telemetry: Option<Arc<Telemetry>>,
     reload_tx: UnboundedSender<Option<Arc<str>>>,
     reload_complete_senders: Vec<oneshot::Sender<()>>,
     installed_dir: PathBuf,
@@ -146,7 +145,6 @@ pub fn init(
             None,
             fs,
             client.http_client().clone(),
-            Some(client.telemetry().clone()),
             node_runtime,
             language_registry,
             theme_registry,
@@ -173,7 +171,6 @@ impl ExtensionStore {
         build_dir: Option<PathBuf>,
         fs: Arc<dyn Fs>,
         http_client: Arc<HttpClientWithUrl>,
-        telemetry: Option<Arc<Telemetry>>,
         node_runtime: Arc<dyn NodeRuntime>,
         language_registry: Arc<LanguageRegistry>,
         theme_registry: Arc<ThemeRegistry>,
@@ -203,7 +200,6 @@ impl ExtensionStore {
             wasm_extensions: Vec::new(),
             fs,
             http_client,
-            telemetry,
             language_registry,
             theme_registry,
             reload_tx,
@@ -758,17 +754,6 @@ impl ExtensionStore {
             reload_count,
             extensions_to_unload.len() - reload_count
         );
-
-        if let Some(telemetry) = &self.telemetry {
-            for extension_id in &extensions_to_load {
-                if let Some(extension) = new_index.extensions.get(extension_id) {
-                    telemetry.report_extension_event(
-                        extension_id.clone(),
-                        extension.manifest.version.clone(),
-                    );
-                }
-            }
-        }
 
         let themes_to_remove = old_index
             .themes

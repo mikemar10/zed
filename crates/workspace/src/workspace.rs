@@ -447,9 +447,8 @@ impl AppState {
 
         let fs = fs::FakeFs::new(cx.background_executor().clone());
         let languages = Arc::new(LanguageRegistry::test(cx.background_executor().clone()));
-        let clock = Arc::new(clock::FakeSystemClock::default());
         let http_client = util::http::FakeHttpClient::with_404_response();
-        let client = Client::new(clock, http_client.clone(), cx);
+        let client = Client::new(http_client.clone());
         let user_store = cx.new_model(|cx| UserStore::new(client.clone(), cx));
         let workspace_store = cx.new_model(|cx| WorkspaceStore::new(client.clone(), cx));
 
@@ -1426,9 +1425,6 @@ impl Workspace {
     }
 
     pub fn open(&mut self, _: &Open, cx: &mut ViewContext<Self>) {
-        self.client()
-            .telemetry()
-            .report_app_event("open project".to_string());
         let paths = cx.prompt_for_paths(PathPromptOptions {
             files: true,
             directories: true,
@@ -1963,12 +1959,6 @@ impl Workspace {
         item: Box<dyn ItemHandle>,
         cx: &mut WindowContext,
     ) {
-        if let Some(text) = item.telemetry_event_text(cx) {
-            self.client()
-                .telemetry()
-                .report_app_event(format!("{}: open", text));
-        }
-
         pane.update(cx, |pane, cx| pane.add_item(item, true, true, None, cx));
     }
 

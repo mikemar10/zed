@@ -9,7 +9,7 @@ mod panel_settings;
 
 use std::{rc::Rc, sync::Arc};
 
-use call::{report_call_event_for_room, ActiveCall};
+use call::ActiveCall;
 pub use collab_panel::CollabPanel;
 pub use collab_titlebar_item::CollabTitlebarItem;
 use gpui::{
@@ -46,23 +46,10 @@ pub fn init(app_state: &Arc<AppState>, cx: &mut AppContext) {
 pub fn toggle_screen_sharing(_: &ToggleScreenSharing, cx: &mut WindowContext) {
     let call = ActiveCall::global(cx).read(cx);
     if let Some(room) = call.room().cloned() {
-        let client = call.client();
         let toggle_screen_sharing = room.update(cx, |room, cx| {
             if room.is_screen_sharing() {
-                report_call_event_for_room(
-                    "disable screen share",
-                    room.id(),
-                    room.channel_id(),
-                    &client,
-                );
                 Task::ready(room.unshare_screen(cx))
             } else {
-                report_call_event_for_room(
-                    "enable screen share",
-                    room.id(),
-                    room.channel_id(),
-                    &client,
-                );
                 room.share_screen(cx)
             }
         });
@@ -73,17 +60,7 @@ pub fn toggle_screen_sharing(_: &ToggleScreenSharing, cx: &mut WindowContext) {
 pub fn toggle_mute(_: &ToggleMute, cx: &mut AppContext) {
     let call = ActiveCall::global(cx).read(cx);
     if let Some(room) = call.room().cloned() {
-        let client = call.client();
-        room.update(cx, |room, cx| {
-            let operation = if room.is_muted() {
-                "enable microphone"
-            } else {
-                "disable microphone"
-            };
-            report_call_event_for_room(operation, room.id(), room.channel_id(), &client);
-
-            room.toggle_mute(cx)
-        });
+        room.update(cx, |room, cx| room.toggle_mute(cx));
     }
 }
 

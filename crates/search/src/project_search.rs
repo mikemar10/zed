@@ -394,10 +394,6 @@ impl Item for ProjectSearchView {
             .into_any()
     }
 
-    fn telemetry_event_text(&self) -> Option<&'static str> {
-        Some("project search")
-    }
-
     fn for_each_project_item(
         &self,
         cx: &AppContext,

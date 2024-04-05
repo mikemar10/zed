@@ -4,7 +4,6 @@ members = [
     "crates/assets",
     "crates/assistant",
     "crates/audio",
-    "crates/auto_update",
     "crates/breadcrumbs",
     "crates/call",
     "crates/channel",
@@ -81,7 +80,6 @@ members = [
     "crates/theme",
     "crates/theme_importer",
     "crates/theme_selector",
-    "crates/telemetry_events",
     "crates/time_format",
     "crates/ui",
     "crates/util",
@@ -112,7 +110,6 @@ ai = { path = "crates/ai" }
 assets = { path = "crates/assets" }
 assistant = { path = "crates/assistant" }
 audio = { path = "crates/audio" }
-auto_update = { path = "crates/auto_update" }
 base64 = "0.13"
 breadcrumbs = { path = "crates/breadcrumbs" }
 call = { path = "crates/call" }
@@ -190,7 +187,6 @@ text = { path = "crates/text" }
 theme = { path = "crates/theme" }
 theme_importer = { path = "crates/theme_importer" }
 theme_selector = { path = "crates/theme_selector" }
-telemetry_events = { path = "crates/telemetry_events" }
 time_format = { path = "crates/time_format" }
 ui = { path = "crates/ui" }
 util = { path = "crates/util" }

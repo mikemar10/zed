@@ -554,7 +554,6 @@ impl Render for MessageEditor {
 mod tests {
     use super::*;
     use client::{Client, User, UserStore};
-    use clock::FakeSystemClock;
     use gpui::TestAppContext;
     use language::{Language, LanguageConfig};
     use rpc::proto;
@@ -625,9 +624,8 @@ mod tests {
             let settings = SettingsStore::test(cx);
             cx.set_global(settings);
 
-            let clock = Arc::new(FakeSystemClock::default());
             let http = FakeHttpClient::with_404_response();
-            let client = Client::new(clock, http.clone(), cx);
+            let client = Client::new(http.clone());
             let user_store = cx.new_model(|cx| UserStore::new(client.clone(), cx));
             theme::init(theme::LoadThemes::JustBase, cx);
             language::init(cx);
