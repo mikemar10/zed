@@ -53,7 +53,6 @@ impl Display for AssistantKind {
 #[serde(tag = "type")]
 pub enum Event {
     Editor(EditorEvent),
-    Copilot(CopilotEvent),
     Call(CallEvent),
     Assistant(AssistantEvent),
     Cpu(CpuEvent),
@@ -70,15 +69,6 @@ pub struct EditorEvent {
     pub operation: String,
     pub file_extension: Option<String>,
     pub vim_mode: bool,
-    pub copilot_enabled: bool,
-    pub copilot_enabled_for_language: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CopilotEvent {
-    pub suggestion_id: Option<String>,
-    pub suggestion_accepted: bool,
-    pub file_extension: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

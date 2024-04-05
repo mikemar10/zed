@@ -1546,7 +1546,6 @@ impl Editor {
         }
 
         if self.has_active_inline_completion(cx) {
-            key_context.add("copilot_suggestion");
             key_context.add("inline_completion");
         }
 
@@ -2561,7 +2560,6 @@ impl Editor {
             }
 
             drop(snapshot);
-            let had_active_copilot_completion = this.has_active_inline_completion(cx);
             this.change_selections(Some(Autoscroll::fit()), cx, |s| s.select(new_selections));
 
             if brace_inserted {
@@ -2577,15 +2575,8 @@ impl Editor {
                 }
             }
 
-            if had_active_copilot_completion {
-                this.refresh_inline_completion(true, cx);
-                if !this.has_active_inline_completion(cx) {
-                    this.trigger_completion_on_input(&text, cx);
-                }
-            } else {
-                this.trigger_completion_on_input(&text, cx);
-                this.refresh_inline_completion(true, cx);
-            }
+            this.trigger_completion_on_input(&text, cx);
+            this.refresh_inline_completion(true, cx);
         });
     }
 
@@ -3936,10 +3927,7 @@ impl Editor {
         if self.has_active_inline_completion(cx) {
             self.cycle_inline_completion(Direction::Next, cx);
         } else {
-            let is_copilot_disabled = self.refresh_inline_completion(false, cx).is_none();
-            if is_copilot_disabled {
-                cx.propagate();
-            }
+            cx.propagate();
         }
     }
 
@@ -3951,10 +3939,7 @@ impl Editor {
         if self.has_active_inline_completion(cx) {
             self.cycle_inline_completion(Direction::Prev, cx);
         } else {
-            let is_copilot_disabled = self.refresh_inline_completion(false, cx).is_none();
-            if is_copilot_disabled {
-                cx.propagate();
-            }
+            cx.propagate();
         }
     }
 
@@ -9549,21 +9534,9 @@ impl Editor {
             .raw_user_settings()
             .get("vim_mode")
             == Some(&serde_json::Value::Bool(true));
-        let copilot_enabled = all_language_settings(file, cx).copilot_enabled(None, None);
-        let copilot_enabled_for_language = self
-            .buffer
-            .read(cx)
-            .settings_at(0, cx)
-            .show_copilot_suggestions;
 
         let telemetry = project.read(cx).client().telemetry().clone();
-        telemetry.report_editor_event(
-            file_extension,
-            vim_mode,
-            operation,
-            copilot_enabled,
-            copilot_enabled_for_language,
-        )
+        telemetry.report_editor_event(file_extension, vim_mode, operation)
     }
 
     /// Copy the highlighted chunks to the clipboard as JSON. The format is an array of lines,

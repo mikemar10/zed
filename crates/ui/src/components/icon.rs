@@ -51,10 +51,6 @@ pub enum IconName {
     Collab,
     Command,
     Control,
-    Copilot,
-    CopilotDisabled,
-    CopilotError,
-    CopilotInit,
     Copy,
     Dash,
     Delete,
@@ -115,7 +111,6 @@ pub enum IconName {
     Update,
     WholeWord,
     XCircle,
-    ZedXCopilot,
 }
 
 impl IconName {
@@ -147,10 +142,6 @@ impl IconName {
             IconName::Collab => "icons/user_group_16.svg",
             IconName::Command => "icons/command.svg",
             IconName::Control => "icons/control.svg",
-            IconName::Copilot => "icons/copilot.svg",
-            IconName::CopilotDisabled => "icons/copilot_disabled.svg",
-            IconName::CopilotError => "icons/copilot_error.svg",
-            IconName::CopilotInit => "icons/copilot_init.svg",
             IconName::Copy => "icons/copy.svg",
             IconName::Dash => "icons/dash.svg",
             IconName::Delete => "icons/delete.svg",
@@ -211,7 +202,6 @@ impl IconName {
             IconName::Update => "icons/update.svg",
             IconName::WholeWord => "icons/word_search.svg",
             IconName::XCircle => "icons/error.svg",
-            IconName::ZedXCopilot => "icons/zed_x_copilot.svg",
         }
     }
 }

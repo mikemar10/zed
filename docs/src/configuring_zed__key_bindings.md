@@ -266,21 +266,18 @@ But, it was impossible to take into account the `{` and `}` when he was typing s
 
 ### Editor (Full Only)
 
-| **Command**         | **Target**    | **Default Shortcut**    |
-| ------------------- | ------------- | ----------------------- |
-| Quote selection     | Assistant     | `⌘` + `>`               |
-| Deploy              | Buffer Search | `⌘` + `E`               |
-| Deploy              | Buffer Search | `⌘` + `F`               |
-| Next suggestion     | Copilot       | `Alt` + `]`             |
-| Previous suggestion | Copilot       | `Alt` + `[`             |
-| Suggest             | Copilot       | `Alt` + `\`             |
-| Newline             | Editor        | `Enter`                 |
-| Newline             | Editor        | `Shift` + `Enter`       |
-| Newline above       | Editor        | `⌘` + `Shift` + `Enter` |
-| Newline below       | Editor        | `⌘` + `Enter`           |
-| Toggle soft wrap    | Editor        | `Alt` + `Z`             |
-| Toggle              | Go To Line    | `Control` + `G`         |
-| Toggle              | Outline       | `⌘` + `Shift` + `O`     |
+| **Command**      | **Target**    | **Default Shortcut**    |
+| ---------------- | ------------- | ----------------------- |
+| Quote selection  | Assistant     | `⌘` + `>`               |
+| Deploy           | Buffer Search | `⌘` + `E`               |
+| Deploy           | Buffer Search | `⌘` + `F`               |
+| Newline          | Editor        | `Enter`                 |
+| Newline          | Editor        | `Shift` + `Enter`       |
+| Newline above    | Editor        | `⌘` + `Shift` + `Enter` |
+| Newline below    | Editor        | `⌘` + `Enter`           |
+| Toggle soft wrap | Editor        | `Alt` + `Z`             |
+| Toggle           | Go To Line    | `Control` + `G`         |
+| Toggle           | Outline       | `⌘` + `Shift` + `O`     |
 
 ### Editor (Auto Height Only)
 

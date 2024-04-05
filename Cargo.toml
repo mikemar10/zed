@@ -16,8 +16,6 @@ members = [
     "crates/collections",
     "crates/command_palette",
     "crates/command_palette_hooks",
-    "crates/copilot",
-    "crates/copilot_ui",
     "crates/db",
     "crates/diagnostics",
     "crates/editor",
@@ -128,8 +126,6 @@ collections = { path = "crates/collections" }
 color = { path = "crates/color" }
 command_palette = { path = "crates/command_palette" }
 command_palette_hooks = { path = "crates/command_palette_hooks" }
-copilot = { path = "crates/copilot" }
-copilot_ui = { path = "crates/copilot_ui" }
 db = { path = "crates/db" }
 diagnostics = { path = "crates/diagnostics" }
 editor = { path = "crates/editor" }

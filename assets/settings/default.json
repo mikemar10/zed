@@ -11,10 +11,7 @@
   // 4. "Atom"
   "base_keymap": "VSCode",
   // Features that can be globally enabled or disabled
-  "features": {
-    // Show Copilot icon in status bar
-    "copilot": true
-  },
+  "features": {},
   // The name of a font to use for rendering text in the editor
   "buffer_font_family": "Zed Mono",
   // The OpenType features to enable for text in the editor.
@@ -98,9 +95,6 @@
   // Otherwise(when `true`), the closing characters are always skipped over and auto-removed
   // no matter how they were inserted.
   "always_treat_brackets_as_autoclosed": false,
-  // Controls whether copilot provides suggestion immediately
-  // or waits for a `copilot::Toggle`
-  "show_copilot_suggestions": true,
   // Whether to show tabs and spaces in the editor.
   // This setting can take three values:
   //
@@ -370,11 +364,6 @@
     // 2. Hide the gutter
     //      "git_gutter": "hide"
     "git_gutter": "tracked_files"
-  },
-  "copilot": {
-    // The set of glob patterns for which copilot should be disabled
-    // in any matching file.
-    "disabled_globs": [".env"]
   },
   // Settings specific to journaling
   "journal": {

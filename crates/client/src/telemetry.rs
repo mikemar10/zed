@@ -14,9 +14,8 @@ use std::io::Write;
 use std::{env, mem, path::PathBuf, sync::Arc, time::Duration};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Pid, ProcessRefreshKind, RefreshKind, System};
 use telemetry_events::{
-    ActionEvent, AppEvent, AssistantEvent, AssistantKind, CallEvent, CopilotEvent, CpuEvent,
-    EditEvent, EditorEvent, Event, EventRequestBody, EventWrapper, ExtensionEvent, MemoryEvent,
-    SettingEvent,
+    ActionEvent, AppEvent, AssistantEvent, AssistantKind, CallEvent, CpuEvent, EditEvent,
+    EditorEvent, Event, EventRequestBody, EventWrapper, ExtensionEvent, MemoryEvent, SettingEvent,
 };
 use tempfile::NamedTempFile;
 use util::http::{self, HttpClient, HttpClientWithUrl, Method};
@@ -229,30 +228,11 @@ impl Telemetry {
         file_extension: Option<String>,
         vim_mode: bool,
         operation: &'static str,
-        copilot_enabled: bool,
-        copilot_enabled_for_language: bool,
     ) {
         let event = Event::Editor(EditorEvent {
             file_extension,
             vim_mode,
             operation: operation.into(),
-            copilot_enabled,
-            copilot_enabled_for_language,
-        });
-
-        self.report_event(event)
-    }
-
-    pub fn report_copilot_event(
-        self: &Arc<Self>,
-        suggestion_id: Option<String>,
-        suggestion_accepted: bool,
-        file_extension: Option<String>,
-    ) {
-        let event = Event::Copilot(CopilotEvent {
-            suggestion_id,
-            suggestion_accepted,
-            file_extension,
         });
 
         self.report_event(event)

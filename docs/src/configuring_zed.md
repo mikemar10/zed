@@ -6,7 +6,6 @@ Folder-specific settings are used to override Zed's global settings for files wi
 
 The following global settings can be overridden with a folder-specific configuration:
 
-- `copilot`
 - `enable_language_server`
 - `ensure_final_newline_on_save`
 - `format_on_save`
@@ -17,7 +16,6 @@ The following global settings can be overridden with a folder-specific configura
 - `remove_trailing_whitespace_on_save`
 - `soft_wrap`
 - `tab_size`
-- `show_copilot_suggestions`
 - `show_whitespaces`
 
 _See the Global settings section for details about these settings_
@@ -141,32 +139,6 @@ For example, to disable ligatures for a given font you can add the following to 
 **Options**
 
 `boolean` values
-
-## Copilot
-
-- Description: Copilot-specific settings.
-- Setting: `copilot`
-- Default:
-
-```json
-"copilot": {
-  "disabled_globs": [
-    ".env"
-  ]
-}
-```
-
-**Options**
-
-### Disabled Globs
-
-- Description: The set of glob patterns for which Copilot should be disabled in any matching file.
-- Setting: `disabled_globs`
-- Default: [".env"]
-
-**Options**
-
-List of `string` values
 
 ## Cursor Blink
 
@@ -589,7 +561,6 @@ The following settings can be overridden for each specific language:
 - `hard_tabs`
 - `preferred_line_length`
 - `remove_trailing_whitespace_on_save`
-- `show_copilot_suggestions`
 - `show_whitespaces`
 - `soft_wrap`
 - `tab_size`
@@ -667,16 +638,6 @@ These values take in the same options as the root-level settings with the same n
 **Options**
 
 `integer` values
-
-## Show Copilot Suggestions
-
-- Description: Whether or not to show Copilot suggestions as you type or wait for a `copilot::Toggle`.
-- Setting: `show_copilot_suggestions`
-- Default: `true`
-
-**Options**
-
-`boolean` values
 
 ## Show Whitespaces
 

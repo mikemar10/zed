@@ -14,8 +14,8 @@ use serde::{Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::sync::{Arc, OnceLock};
 use telemetry_events::{
-    ActionEvent, AppEvent, AssistantEvent, CallEvent, CopilotEvent, CpuEvent, EditEvent,
-    EditorEvent, Event, EventRequestBody, EventWrapper, ExtensionEvent, MemoryEvent, SettingEvent,
+    ActionEvent, AppEvent, AssistantEvent, CallEvent, CpuEvent, EditEvent, EditorEvent, Event,
+    EventRequestBody, EventWrapper, ExtensionEvent, MemoryEvent, SettingEvent,
 };
 use util::SemanticVersion;
 
@@ -270,13 +270,6 @@ pub async fn post_events(
                 first_event_at,
                 country_code.clone(),
             )),
-            Event::Copilot(event) => to_upload.copilot_events.push(CopilotEventRow::from_event(
-                event.clone(),
-                &wrapper,
-                &request_body,
-                first_event_at,
-                country_code.clone(),
-            )),
             Event::Call(event) => to_upload.call_events.push(CallEventRow::from_event(
                 event.clone(),
                 &wrapper,
@@ -358,7 +351,6 @@ pub async fn post_events(
 #[derive(Default)]
 struct ToUpload {
     editor_events: Vec<EditorEventRow>,
-    copilot_events: Vec<CopilotEventRow>,
     assistant_events: Vec<AssistantEventRow>,
     call_events: Vec<CallEventRow>,
     cpu_events: Vec<CpuEventRow>,
@@ -376,15 +368,6 @@ impl ToUpload {
         Self::upload_to_table(EDITOR_EVENTS_TABLE, &self.editor_events, clickhouse_client)
             .await
             .with_context(|| format!("failed to upload to table '{EDITOR_EVENTS_TABLE}'"))?;
-
-        const COPILOT_EVENTS_TABLE: &str = "copilot_events";
-        Self::upload_to_table(
-            COPILOT_EVENTS_TABLE,
-            &self.copilot_events,
-            clickhouse_client,
-        )
-        .await
-        .with_context(|| format!("failed to upload to table '{COPILOT_EVENTS_TABLE}'"))?;
 
         const ASSISTANT_EVENTS_TABLE: &str = "assistant_events";
         Self::upload_to_table(
@@ -497,8 +480,6 @@ pub struct EditorEventRow {
     pub region_code: String,
     pub city: String,
     pub time: i64,
-    pub copilot_enabled: bool,
-    pub copilot_enabled_for_language: bool,
     pub historical_event: bool,
     pub architecture: String,
     pub is_staff: Option<bool>,
@@ -537,70 +518,10 @@ impl EditorEventRow {
             file_extension: event.file_extension.unwrap_or_default(),
             signed_in: wrapper.signed_in,
             vim_mode: event.vim_mode,
-            copilot_enabled: event.copilot_enabled,
-            copilot_enabled_for_language: event.copilot_enabled_for_language,
             country_code: country_code.unwrap_or("XX".to_string()),
             region_code: "".to_string(),
             city: "".to_string(),
             historical_event: false,
-        }
-    }
-}
-
-#[derive(Serialize, Debug, clickhouse::Row)]
-pub struct CopilotEventRow {
-    pub installation_id: String,
-    pub suggestion_id: String,
-    pub suggestion_accepted: bool,
-    pub app_version: String,
-    pub file_extension: String,
-    pub os_name: String,
-    pub os_version: String,
-    pub release_channel: String,
-    pub signed_in: bool,
-    #[serde(serialize_with = "serialize_country_code")]
-    pub country_code: String,
-    pub region_code: String,
-    pub city: String,
-    pub time: i64,
-    pub is_staff: Option<bool>,
-    pub session_id: Option<String>,
-    pub major: Option<i32>,
-    pub minor: Option<i32>,
-    pub patch: Option<i32>,
-}
-
-impl CopilotEventRow {
-    fn from_event(
-        event: CopilotEvent,
-        wrapper: &EventWrapper,
-        body: &EventRequestBody,
-        first_event_at: chrono::DateTime<chrono::Utc>,
-        country_code: Option<String>,
-    ) -> Self {
-        let semver = body.semver();
-        let time =
-            first_event_at + chrono::Duration::milliseconds(wrapper.milliseconds_since_first_event);
-
-        Self {
-            app_version: body.app_version.clone(),
-            major: semver.map(|s| s.major as i32),
-            minor: semver.map(|s| s.minor as i32),
-            patch: semver.map(|s| s.patch as i32),
-            release_channel: body.release_channel.clone().unwrap_or_default(),
-            os_name: body.os_name.clone(),
-            os_version: body.os_version.clone().unwrap_or_default(),
-            installation_id: body.installation_id.clone().unwrap_or_default(),
-            session_id: body.session_id.clone(),
-            is_staff: body.is_staff,
-            time: time.timestamp_millis(),
-            file_extension: event.file_extension.unwrap_or_default(),
-            signed_in: wrapper.signed_in,
-            country_code: country_code.unwrap_or("XX".to_string()),
-            region_code: "".to_string(),
-            city: "".to_string(),
-            suggestion_id: event.suggestion_id.unwrap_or_default(),
-            suggestion_accepted: event.suggestion_accepted,
         }
     }
 }
