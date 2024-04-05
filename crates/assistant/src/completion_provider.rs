@@ -15,21 +15,15 @@ use crate::{
 use anyhow::Result;
 use client::Client;
 use futures::{future::BoxFuture, stream::BoxStream};
-use gpui::{AnyView, AppContext, BorrowAppContext, Task, WindowContext};
+use gpui::{AppContext, BorrowAppContext};
 use settings::{Settings, SettingsStore};
 use std::sync::Arc;
 
 pub fn init(client: Arc<Client>, cx: &mut AppContext) {
-    let mut settings_version = 0;
     let provider = match &AssistantSettings::get_global(cx).provider {
-        AssistantProvider::ZedDotDev { default_model } => {
-            CompletionProvider::ZedDotDev(ZedDotDevCompletionProvider::new(
-                default_model.clone(),
-                client.clone(),
-                settings_version,
-                cx,
-            ))
-        }
+        AssistantProvider::ZedDotDev { default_model } => CompletionProvider::ZedDotDev(
+            ZedDotDevCompletionProvider::new(default_model.clone(), client.clone(), cx),
+        ),
         AssistantProvider::OpenAi {
             default_model,
             api_url,
@@ -37,13 +31,11 @@ pub fn init(client: Arc<Client>, cx: &mut AppContext) {
             default_model.clone(),
             api_url.clone(),
             client.http_client(),
-            settings_version,
         )),
     };
     cx.set_global(provider);
 
     cx.observe_global::<SettingsStore>(move |cx| {
-        settings_version += 1;
         cx.update_global::<CompletionProvider, _>(|provider, cx| {
             match (&mut *provider, &AssistantSettings::get_global(cx).provider) {
                 (
@@ -53,19 +45,18 @@ pub fn init(client: Arc<Client>, cx: &mut AppContext) {
                         api_url,
                     },
                 ) => {
-                    provider.update(default_model.clone(), api_url.clone(), settings_version);
+                    provider.update(default_model.clone(), api_url.clone());
                 }
                 (
                     CompletionProvider::ZedDotDev(provider),
                     AssistantProvider::ZedDotDev { default_model },
                 ) => {
-                    provider.update(default_model.clone(), settings_version);
+                    provider.update(default_model.clone());
                 }
                 (CompletionProvider::OpenAi(_), AssistantProvider::ZedDotDev { default_model }) => {
                     *provider = CompletionProvider::ZedDotDev(ZedDotDevCompletionProvider::new(
                         default_model.clone(),
                         client.clone(),
-                        settings_version,
                         cx,
                     ));
                 }
@@ -80,7 +71,6 @@ pub fn init(client: Arc<Client>, cx: &mut AppContext) {
                         default_model.clone(),
                         api_url.clone(),
                         client.http_client(),
-                        settings_version,
                     ));
                 }
                 #[cfg(test)]
@@ -103,51 +93,6 @@ impl gpui::Global for CompletionProvider {}
 impl CompletionProvider {
     pub fn global(cx: &AppContext) -> &Self {
         cx.global::<Self>()
-    }
-
-    pub fn settings_version(&self) -> usize {
-        match self {
-            CompletionProvider::OpenAi(provider) => provider.settings_version(),
-            CompletionProvider::ZedDotDev(provider) => provider.settings_version(),
-            #[cfg(test)]
-            CompletionProvider::Fake(_) => unimplemented!(),
-        }
-    }
-
-    pub fn is_authenticated(&self) -> bool {
-        match self {
-            CompletionProvider::OpenAi(provider) => provider.is_authenticated(),
-            CompletionProvider::ZedDotDev(provider) => provider.is_authenticated(),
-            #[cfg(test)]
-            CompletionProvider::Fake(_) => true,
-        }
-    }
-
-    pub fn authenticate(&self, cx: &AppContext) -> Task<Result<()>> {
-        match self {
-            CompletionProvider::OpenAi(provider) => provider.authenticate(cx),
-            CompletionProvider::ZedDotDev(provider) => provider.authenticate(cx),
-            #[cfg(test)]
-            CompletionProvider::Fake(_) => Task::ready(Ok(())),
-        }
-    }
-
-    pub fn authentication_prompt(&self, cx: &mut WindowContext) -> AnyView {
-        match self {
-            CompletionProvider::OpenAi(provider) => provider.authentication_prompt(cx),
-            CompletionProvider::ZedDotDev(provider) => provider.authentication_prompt(cx),
-            #[cfg(test)]
-            CompletionProvider::Fake(_) => unimplemented!(),
-        }
-    }
-
-    pub fn reset_credentials(&self, cx: &AppContext) -> Task<Result<()>> {
-        match self {
-            CompletionProvider::OpenAi(provider) => provider.reset_credentials(cx),
-            CompletionProvider::ZedDotDev(_) => Task::ready(Ok(())),
-            #[cfg(test)]
-            CompletionProvider::Fake(_) => Task::ready(Ok(())),
-        }
     }
 
     pub fn default_model(&self) -> LanguageModel {

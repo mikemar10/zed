@@ -190,7 +190,6 @@ blade-rwh = { package = "raw-window-handle", version = "0.5" }
 cap-std = "3.0"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.4", features = ["derive"] }
-clickhouse = { version = "0.11.6" }
 ctor = "0.2.6"
 core-foundation = { version = "0.9.3" }
 core-foundation-sys = "0.8.6"

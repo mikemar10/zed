@@ -25,7 +25,6 @@ use zed_actions::OpenZedUrl;
 actions!(command_palette, [Toggle]);
 
 pub fn init(cx: &mut AppContext) {
-    client::init_settings(cx);
     cx.set_global(HitCounts::default());
     command_palette_hooks::init(cx);
     cx.observe_new_views(CommandPalette::register).detach();
@@ -169,7 +168,7 @@ impl CommandPaletteDelegate {
         let mut intercept_result = CommandPaletteInterceptor::try_global(cx)
             .and_then(|interceptor| interceptor.intercept(&query, cx));
 
-        if parse_zed_link(&query, cx).is_some() {
+        if parse_zed_link(&query).is_some() {
             intercept_result = Some(CommandInterceptResult {
                 action: OpenZedUrl { url: query.clone() }.boxed_clone(),
                 string: query.clone(),

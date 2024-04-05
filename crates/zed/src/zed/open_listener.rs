@@ -29,7 +29,7 @@ pub struct OpenRequest {
 }
 
 impl OpenRequest {
-    pub fn parse(urls: Vec<String>, cx: &AppContext) -> Result<Self> {
+    pub fn parse(urls: Vec<String>) -> Result<Self> {
         let mut this = Self::default();
         for url in urls {
             if let Some(server_name) = url.strip_prefix("zed-cli://") {
@@ -38,7 +38,7 @@ impl OpenRequest {
                 this.parse_file_path(file)
             } else if let Some(file) = url.strip_prefix("zed://file") {
                 this.parse_file_path(file)
-            } else if let Some(request_path) = parse_zed_link(&url, cx) {
+            } else if let Some(request_path) = parse_zed_link(&url) {
                 this.parse_request_path(request_path).log_err();
             } else {
                 log::error!("unhandled url: {}", url);

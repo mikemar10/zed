@@ -8,7 +8,7 @@ use backtrace::Backtrace;
 use chrono::Utc;
 use clap::{command, Parser};
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{parse_zed_link, Client, ClientSettings, DevServerToken};
+use client::{parse_zed_link, Client};
 use db::kvp::KEY_VALUE_STORE;
 use editor::Editor;
 use env_logger::Builder;
@@ -24,9 +24,7 @@ use mimalloc::MiMalloc;
 use node_runtime::RealNodeRuntime;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use settings::{
-    default_settings, handle_settings_file_changes, watch_config_file, Settings, SettingsStore,
-};
+use settings::{default_settings, handle_settings_file_changes, watch_config_file, SettingsStore};
 use simplelog::ConfigBuilder;
 use smol::process::Command;
 use std::{
@@ -43,7 +41,6 @@ use std::{
 };
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry, ThemeSettings};
 use util::{http::HttpClientWithUrl, maybe, paths, ResultExt};
-use uuid::Uuid;
 use welcome::{show_welcome_view, FIRST_OPEN};
 use workspace::{AppState, WorkspaceStore};
 use zed::{
@@ -69,13 +66,7 @@ fn main() {
     log::info!("========== starting zed ==========");
     let app = App::new().with_assets(Assets);
 
-    let (installation_id, _existing_installation_id_found) = app
-        .background_executor()
-        .block(installation_id())
-        .ok()
-        .unzip();
-    let session_id = Uuid::new_v4().to_string();
-    init_panic_hook(&app, installation_id.clone(), session_id.clone());
+    init_panic_hook(&app);
 
     let fs = Arc::new(RealFs);
     let user_settings_file_rx = watch_config_file(
@@ -124,12 +115,8 @@ fn main() {
         cx.set_global(store);
         handle_settings_file_changes(user_settings_file_rx, cx);
         handle_keymap_file_changes(user_keymap_file_rx, cx);
-        client::init_settings(cx);
 
-        let http = Arc::new(HttpClientWithUrl::new(
-            &client::ClientSettings::get_global(cx).server_url,
-        ));
-
+        let http = Arc::new(HttpClientWithUrl::new("http://unsupported.me"));
         let client = client::Client::new(http.clone());
         let mut languages =
             LanguageRegistry::new(login_shell_env_loaded, cx.background_executor().clone());
@@ -146,7 +133,6 @@ fn main() {
         zed::init(cx);
         theme::init(theme::LoadThemes::All(Box::new(Assets)), cx);
         project::Project::init(&client, cx);
-        client::init(&client, cx);
         command_palette::init(cx);
         language::init(cx);
         editor::init(cx);
@@ -171,18 +157,9 @@ fn main() {
         languages.set_theme(cx.theme().clone());
         cx.observe_global::<SettingsStore>({
             let languages = languages.clone();
-            let http = http.clone();
-            let client = client.clone();
 
             move |cx| {
                 languages.set_theme(cx.theme().clone());
-                let new_host = &client::ClientSettings::get_global(cx).server_url;
-                if &http.base_url() != new_host {
-                    http.set_base_url(new_host);
-                    if client.status().borrow().is_connected() {
-                        client.reconnect(&cx.to_async());
-                    }
-                }
             }
         })
         .detach();
@@ -223,40 +200,26 @@ fn main() {
 
         cx.activate(true);
 
-        let mut args = Args::parse();
-        if let Some(dev_server_token) = args.dev_server_token.take() {
-            let dev_server_token = DevServerToken(dev_server_token);
-            let server_url = ClientSettings::get_global(&cx).server_url.clone();
-            let client = client.clone();
-            client.set_dev_server_token(dev_server_token);
-            cx.spawn(|cx| async move {
-                client.authenticate_and_connect(false, &cx).await?;
-                log::info!("Connected to {}", server_url);
-                anyhow::Ok(())
-            })
-            .detach_and_log_err(cx);
-        } else {
-            let urls: Vec<_> = args
-                .paths_or_urls
-                .iter()
-                .filter_map(|arg| parse_url_arg(arg, cx).log_err())
-                .collect();
+        let args = Args::parse();
 
-            if !urls.is_empty() {
-                listener.open_urls(urls)
-            }
+        let urls: Vec<_> = args
+            .paths_or_urls
+            .iter()
+            .filter_map(|arg| parse_url_arg(arg).log_err())
+            .collect();
+
+        if !urls.is_empty() {
+            listener.open_urls(urls)
         }
-
-        let mut triggered_authentication = false;
 
         match open_rx
             .try_next()
             .ok()
             .flatten()
-            .and_then(|urls| OpenRequest::parse(urls, cx).log_err())
+            .and_then(|urls| OpenRequest::parse(urls).log_err())
         {
             Some(request) => {
-                triggered_authentication = handle_open_request(request, app_state.clone(), cx)
+                handle_open_request(request, app_state.clone(), cx);
             }
             None => cx
                 .spawn({
@@ -270,7 +233,7 @@ fn main() {
         cx.spawn(move |cx| async move {
             while let Some(urls) = open_rx.next().await {
                 cx.update(|cx| {
-                    if let Some(request) = OpenRequest::parse(urls, cx).log_err() {
+                    if let Some(request) = OpenRequest::parse(urls).log_err() {
                         handle_open_request(request, app_state.clone(), cx);
                     }
                 })
@@ -278,11 +241,6 @@ fn main() {
             }
         })
         .detach();
-
-        if !triggered_authentication {
-            cx.spawn(|cx| async move { authenticate(client, &cx).await })
-                .detach_and_log_err(cx);
-        }
     });
 }
 
@@ -322,43 +280,6 @@ fn handle_open_request(
         task.detach_and_log_err(cx)
     }
     false
-}
-
-async fn authenticate(client: Arc<Client>, cx: &AsyncAppContext) -> Result<()> {
-    if stdout_is_a_pty() {
-        if client::IMPERSONATE_LOGIN.is_some() {
-            client.authenticate_and_connect(false, &cx).await?;
-        }
-    } else if client.has_keychain_credentials(&cx).await {
-        client.authenticate_and_connect(true, &cx).await?;
-    }
-    Ok::<_, anyhow::Error>(())
-}
-
-async fn installation_id() -> Result<(String, bool)> {
-    let legacy_key_name = "device_id".to_string();
-    let key_name = "installation_id".to_string();
-
-    // Migrate legacy key to new key
-    if let Ok(Some(installation_id)) = KEY_VALUE_STORE.read_kvp(&legacy_key_name) {
-        KEY_VALUE_STORE
-            .write_kvp(key_name, installation_id.clone())
-            .await?;
-        KEY_VALUE_STORE.delete_kvp(legacy_key_name).await?;
-        return Ok((installation_id, true));
-    }
-
-    if let Ok(Some(installation_id)) = KEY_VALUE_STORE.read_kvp(&key_name) {
-        return Ok((installation_id, true));
-    }
-
-    let installation_id = Uuid::new_v4().to_string();
-
-    KEY_VALUE_STORE
-        .write_kvp(key_name, installation_id.clone())
-        .await?;
-
-    Ok((installation_id, false))
 }
 
 async fn restore_or_create_workspace(app_state: Arc<AppState>, cx: AsyncAppContext) {
@@ -485,9 +406,6 @@ struct Panic {
     os_version: Option<String>,
     architecture: String,
     panicked_on: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    installation_id: Option<String>,
-    session_id: String,
 }
 
 #[derive(Serialize)]
@@ -497,7 +415,7 @@ struct PanicRequest {
 
 static PANIC_COUNT: AtomicU32 = AtomicU32::new(0);
 
-fn init_panic_hook(app: &App, installation_id: Option<String>, session_id: String) {
+fn init_panic_hook(app: &App) {
     let is_pty = stdout_is_a_pty();
     let app_metadata = app.metadata();
 
@@ -564,8 +482,6 @@ fn init_panic_hook(app: &App, installation_id: Option<String>, session_id: Strin
             architecture: env::consts::ARCH.into(),
             panicked_on: Utc::now().timestamp_millis(),
             backtrace,
-            installation_id: installation_id.clone(),
-            session_id: session_id.clone(),
         };
 
         if let Some(panic_data_json) = serde_json::to_string_pretty(&panic_data).log_err() {
@@ -662,19 +578,15 @@ struct Args {
     ///
     /// URLs can either be file:// or zed:// scheme, or relative to https://zed.dev.
     paths_or_urls: Vec<String>,
-
-    /// Instructs zed to run as a dev server on this machine. (not implemented)
-    #[arg(long)]
-    dev_server_token: Option<String>,
 }
 
-fn parse_url_arg(arg: &str, cx: &AppContext) -> Result<String> {
+fn parse_url_arg(arg: &str) -> Result<String> {
     match std::fs::canonicalize(Path::new(&arg)) {
         Ok(path) => Ok(format!("file://{}", path.to_string_lossy())),
         Err(error) => {
             if arg.starts_with("file://") || arg.starts_with("zed-cli://") {
                 Ok(arg.into())
-            } else if let Some(_) = parse_zed_link(&arg, cx) {
+            } else if let Some(_) = parse_zed_link(&arg) {
                 Ok(arg.into())
             } else {
                 Err(anyhow!("error parsing path argument: {}", error))

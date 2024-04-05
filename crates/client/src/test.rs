@@ -1,4 +1,3 @@
-use crate::{Client, Connection, Credentials, EstablishConnectionError};
 use anyhow::{anyhow, Result};
 use futures::{stream::BoxStream, StreamExt};
 use gpui::{BackgroundExecutor, TestAppContext};
@@ -25,82 +24,12 @@ struct FakeServerState {
 }
 
 impl FakeServer {
-    pub async fn for_client(client: &Arc<Client>, cx: &TestAppContext) -> Self {
+    pub async fn for_client(cx: &TestAppContext) -> Self {
         let server = Self {
             peer: Peer::new(0),
             state: Default::default(),
             executor: cx.executor(),
         };
-
-        client
-            .override_authenticate({
-                let state = Arc::downgrade(&server.state);
-                move |cx| {
-                    let state = state.clone();
-                    cx.spawn(move |_| async move {
-                        let state = state.upgrade().ok_or_else(|| anyhow!("server dropped"))?;
-                        let mut state = state.lock();
-                        state.auth_count += 1;
-                        let access_token = state.access_token.to_string();
-                        Ok(Credentials::User {
-                            user_id: 5,
-                            access_token,
-                        })
-                    })
-                }
-            })
-            .override_establish_connection({
-                let peer = Arc::downgrade(&server.peer);
-                let state = Arc::downgrade(&server.state);
-                move |credentials, cx| {
-                    let peer = peer.clone();
-                    let state = state.clone();
-                    let credentials = credentials.clone();
-                    cx.spawn(move |cx| async move {
-                        let state = state.upgrade().ok_or_else(|| anyhow!("server dropped"))?;
-                        let peer = peer.upgrade().ok_or_else(|| anyhow!("server dropped"))?;
-                        if state.lock().forbid_connections {
-                            Err(EstablishConnectionError::Other(anyhow!(
-                                "server is forbidding connections"
-                            )))?
-                        }
-
-                        if credentials
-                            != (Credentials::User {
-                                user_id: 5,
-                                access_token: state.lock().access_token.to_string(),
-                            })
-                        {
-                            Err(EstablishConnectionError::Unauthorized)?
-                        }
-
-                        let (client_conn, server_conn, _) =
-                            Connection::in_memory(cx.background_executor().clone());
-                        let (connection_id, io, incoming) =
-                            peer.add_test_connection(server_conn, cx.background_executor().clone());
-                        cx.background_executor().spawn(io).detach();
-                        {
-                            let mut state = state.lock();
-                            state.connection_id = Some(connection_id);
-                            state.incoming = Some(incoming);
-                        }
-                        peer.send(
-                            connection_id,
-                            proto::Hello {
-                                peer_id: Some(connection_id.into()),
-                            },
-                        )
-                        .unwrap();
-
-                        Ok(client_conn)
-                    })
-                }
-            });
-
-        client
-            .authenticate_and_connect(false, &cx.to_async())
-            .await
-            .unwrap();
 
         server
     }

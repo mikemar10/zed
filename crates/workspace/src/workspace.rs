@@ -392,7 +392,6 @@ impl AppState {
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
         theme::init(theme::LoadThemes::JustBase, cx);
-        client::init(&client, cx);
         crate::init_settings(cx);
 
         Arc::new(Self {
@@ -3239,7 +3238,6 @@ pub async fn last_opened_workspace_paths() -> Option<WorkspaceLocation> {
     DB.last_workspace().await.log_err().flatten()
 }
 
-actions!(collab, [OpenChannelNotes]);
 actions!(zed, [OpenLog]);
 
 pub async fn get_any_active_workspace(

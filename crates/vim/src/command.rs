@@ -296,20 +296,6 @@ pub fn command_interceptor(mut query: &str, cx: &AppContext) -> Option<CommandIn
             cx.build_action("terminal_panel::ToggleFocus", None)
                 .unwrap(),
         ),
-        "C" | "Co" | "Col" | "Coll" | "Colla" | "Collab" => (
-            "Collab",
-            cx.build_action("collab_panel::ToggleFocus", None).unwrap(),
-        ),
-        "Ch" | "Cha" | "Chat" => (
-            "Chat",
-            cx.build_action("chat_panel::ToggleFocus", None).unwrap(),
-        ),
-        "No" | "Not" | "Noti" | "Notif" | "Notifi" | "Notific" | "Notifica" | "Notificat"
-        | "Notificati" | "Notificatio" | "Notification" => (
-            "Notifications",
-            cx.build_action("notification_panel::ToggleFocus", None)
-                .unwrap(),
-        ),
         "A" | "AI" | "Ai" => (
             "AI",
             cx.build_action("assistant::ToggleFocus", None).unwrap(),

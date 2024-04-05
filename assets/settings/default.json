@@ -106,12 +106,6 @@
   //   "all"
   "show_whitespaces": "selection",
   // Settings related to calls in Zed
-  "calls": {
-    // Join calls with the microphone live by default
-    "mute_on_join": false,
-    // Share your project when you are the first to join a channel
-    "share_on_join": true
-  },
   // Toolbar related settings
   "toolbar": {
     // Whether to show breadcrumbs.
@@ -207,34 +201,10 @@
     // Gitignored entries are never auto revealed.
     "auto_reveal_entries": true
   },
-  "collaboration_panel": {
-    // Whether to show the collaboration panel button in the status bar.
-    "button": true,
-    // Where to dock the collaboration panel. Can be 'left' or 'right'.
-    "dock": "left",
-    // Default width of the collaboration panel.
-    "default_width": 240
-  },
-  "chat_panel": {
-    // Whether to show the chat panel button in the status bar.
-    "button": true,
-    // Where to the chat panel. Can be 'left' or 'right'.
-    "dock": "right",
-    // Default width of the chat panel.
-    "default_width": 240
-  },
   "message_editor": {
     // Whether to automatically replace emoji shortcodes with emoji characters.
     // For example: typing `:wave:` gets replaced with `👋`.
     "auto_replace_emoji_shortcode": true
-  },
-  "notification_panel": {
-    // Whether to show the notification panel button in the status bar.
-    "button": true,
-    // Where to dock the notification panel. Can be 'left' or 'right'.
-    "dock": "right",
-    // Default width of the notification panel.
-    "default_width": 380
   },
   "assistant": {
     // Version of this setting.
@@ -261,8 +231,6 @@
       "default_model": "gpt-4-turbo-preview"
     }
   },
-  // Whether the screen sharing icon is shown in the os status bar.
-  "show_call_status_icon": true,
   // Whether to use language servers to provide code intelligence.
   "enable_language_server": true,
   // When to automatically save edited buffers. This setting can
@@ -600,9 +568,6 @@
     "use_multiline_find": false,
     "use_smartcase_find": false
   },
-  // The server to connect to. If the environment variable
-  // ZED_SERVER_URL is set, it will override this setting.
-  "server_url": "https://zed.dev",
   // Settings overrides to use when using Zed Preview.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "preview": {

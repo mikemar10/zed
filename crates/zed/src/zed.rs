@@ -2610,7 +2610,6 @@ mod tests {
             let app_state = AppState::test(cx);
 
             theme::init(theme::LoadThemes::JustBase, cx);
-            client::init(&app_state.client, cx);
             language::init(cx);
             workspace::init(app_state.clone(), cx);
             welcome::init(cx);

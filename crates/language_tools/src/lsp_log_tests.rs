@@ -106,7 +106,6 @@ fn init_test(cx: &mut gpui::TestAppContext) {
         cx.set_global(settings_store);
         theme::init(theme::LoadThemes::JustBase, cx);
         language::init(cx);
-        client::init_settings(cx);
         Project::init_settings(cx);
         editor::init_settings(cx);
     });

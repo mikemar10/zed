@@ -4,7 +4,7 @@ use crate::{
     prompts::generate_content_prompt,
     Assist, CompletionProvider, CycleMessageRole, InlineAssist, LanguageModel,
     LanguageModelRequest, LanguageModelRequestMessage, MessageId, MessageMetadata, MessageStatus,
-    NewConversation, QuoteSelection, ResetKey, Role, SavedConversation, SavedConversationMetadata,
+    NewConversation, QuoteSelection, Role, SavedConversation, SavedConversationMetadata,
     SavedMessage, Split, ToggleFocus, ToggleIncludeConversation,
 };
 use anyhow::Result;
@@ -22,7 +22,7 @@ use editor::{
 use fs::Fs;
 use futures::StreamExt;
 use gpui::{
-    canvas, div, point, relative, rems, uniform_list, Action, AnyElement, AnyView, AppContext,
+    canvas, div, point, relative, rems, uniform_list, Action, AnyElement, AppContext,
     AsyncAppContext, AsyncWindowContext, AvailableSpace, ClipboardItem, Context, EventEmitter,
     FocusHandle, FocusableView, FontStyle, FontWeight, HighlightStyle, InteractiveElement,
     IntoElement, Model, ModelContext, ParentElement, Pixels, Render, SharedString,
@@ -90,7 +90,6 @@ pub struct AssistantPanel {
     inline_prompt_history: VecDeque<String>,
     _watch_saved_conversations: Task<Result<()>>,
     model: LanguageModel,
-    authentication_prompt: Option<AnyView>,
 }
 
 struct ActiveConversationEditor {
@@ -148,12 +147,8 @@ impl AssistantPanel {
                         cx.on_focus_in(&focus_handle, Self::focus_in),
                         cx.on_focus_out(&focus_handle, Self::focus_out),
                         cx.observe_global::<CompletionProvider>({
-                            let mut prev_settings_version =
-                                CompletionProvider::global(cx).settings_version();
                             move |this, cx| {
-                                this.completion_provider_changed(prev_settings_version, cx);
-                                prev_settings_version =
-                                    CompletionProvider::global(cx).settings_version();
+                                this.completion_provider_changed(cx);
                             }
                         }),
                     ];
@@ -180,7 +175,6 @@ impl AssistantPanel {
                         inline_prompt_history: Default::default(),
                         _watch_saved_conversations,
                         model,
-                        authentication_prompt: None,
                     }
                 })
             })
@@ -204,27 +198,12 @@ impl AssistantPanel {
         cx.notify();
     }
 
-    fn completion_provider_changed(
-        &mut self,
-        prev_settings_version: usize,
-        cx: &mut ViewContext<Self>,
-    ) {
-        if self.is_authenticated(cx) {
-            self.authentication_prompt = None;
+    fn completion_provider_changed(&mut self, cx: &mut ViewContext<Self>) {
+        let model = CompletionProvider::global(cx).default_model();
+        self.set_model(model, cx);
 
-            let model = CompletionProvider::global(cx).default_model();
-            self.set_model(model, cx);
-
-            if self.active_conversation_editor().is_none() {
-                self.new_conversation(cx);
-            }
-        } else if self.authentication_prompt.is_none()
-            || prev_settings_version != CompletionProvider::global(cx).settings_version()
-        {
-            self.authentication_prompt =
-                Some(cx.update_global::<CompletionProvider, _>(|provider, cx| {
-                    provider.authentication_prompt(cx)
-                }));
+        if self.active_conversation_editor().is_none() {
+            self.new_conversation(cx);
         }
     }
 
@@ -251,30 +230,9 @@ impl AssistantPanel {
         };
         let project = workspace.project().clone();
 
-        if assistant.update(cx, |assistant, cx| assistant.is_authenticated(cx)) {
-            assistant.update(cx, |assistant, cx| {
-                assistant.new_inline_assist(&active_editor, cx, &project)
-            });
-        } else {
-            let assistant = assistant.downgrade();
-            cx.spawn(|workspace, mut cx| async move {
-                assistant
-                    .update(&mut cx, |assistant, cx| assistant.authenticate(cx))?
-                    .await?;
-                if assistant.update(&mut cx, |assistant, cx| assistant.is_authenticated(cx))? {
-                    assistant.update(&mut cx, |assistant, cx| {
-                        assistant.new_inline_assist(&active_editor, cx, &project)
-                    })?;
-                } else {
-                    workspace.update(&mut cx, |workspace, cx| {
-                        workspace.focus_panel::<AssistantPanel>(cx)
-                    })?;
-                }
-
-                anyhow::Ok(())
-            })
-            .detach_and_log_err(cx)
-        }
+        assistant.update(cx, |assistant, cx| {
+            assistant.new_inline_assist(&active_editor, cx, &project)
+        });
     }
 
     fn new_inline_assist(
@@ -848,12 +806,6 @@ impl AssistantPanel {
         }
     }
 
-    fn reset_credentials(&mut self, _: &ResetKey, cx: &mut ViewContext<Self>) {
-        CompletionProvider::global(cx)
-            .reset_credentials(cx)
-            .detach_and_log_err(cx);
-    }
-
     fn active_conversation_editor(&self) -> Option<&View<ConversationEditor>> {
         Some(&self.active_conversation_editor.as_ref()?.editor)
     }
@@ -993,14 +945,6 @@ impl AssistantPanel {
         })
     }
 
-    fn is_authenticated(&mut self, cx: &mut ViewContext<Self>) -> bool {
-        CompletionProvider::global(cx).is_authenticated()
-    }
-
-    fn authenticate(&mut self, cx: &mut ViewContext<Self>) -> Task<Result<()>> {
-        cx.update_global::<CompletionProvider, _>(|provider, cx| provider.authenticate(cx))
-    }
-
     fn render_signed_in(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let header = TabBar::new("assistant_header")
             .start_child(
@@ -1055,7 +999,6 @@ impl AssistantPanel {
             .on_action(cx.listener(AssistantPanel::select_next_match))
             .on_action(cx.listener(AssistantPanel::select_prev_match))
             .on_action(cx.listener(AssistantPanel::handle_editor_cancel))
-            .on_action(cx.listener(AssistantPanel::reset_credentials))
             .track_focus(&self.focus_handle)
             .child(header)
             .children(if self.toolbar.read(cx).hidden() {
@@ -1143,11 +1086,7 @@ impl AssistantPanel {
 
 impl Render for AssistantPanel {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        if let Some(authentication_prompt) = self.authentication_prompt.as_ref() {
-            authentication_prompt.clone().into_any()
-        } else {
-            self.render_signed_in(cx).into_any_element()
-        }
+        self.render_signed_in(cx).into_any_element()
     }
 }
 
@@ -1208,11 +1147,9 @@ impl Panel for AssistantPanel {
 
     fn set_active(&mut self, active: bool, cx: &mut ViewContext<Self>) {
         if active {
-            let load_credentials = self.authenticate(cx);
             cx.spawn(|this, mut cx| async move {
-                load_credentials.await?;
                 this.update(&mut cx, |this, cx| {
-                    if this.is_authenticated(cx) && this.active_conversation_editor().is_none() {
+                    if this.active_conversation_editor().is_none() {
                         this.new_conversation(cx);
                     }
                 })
@@ -1509,11 +1446,6 @@ impl Conversation {
         }
 
         if should_assist {
-            if !CompletionProvider::global(cx).is_authenticated() {
-                log::info!("completion provider has no credentials");
-                return Default::default();
-            }
-
             let request = self.to_completion_request(cx);
             let stream = CompletionProvider::global(cx).complete(request);
             let assistant_message = self
@@ -1787,10 +1719,6 @@ impl Conversation {
 
     fn summarize(&mut self, cx: &mut ModelContext<Self>) {
         if self.message_anchors.len() >= 2 && self.summary.is_none() {
-            if !CompletionProvider::global(cx).is_authenticated() {
-                return;
-            }
-
             let messages = self
                 .messages(cx)
                 .take(2)

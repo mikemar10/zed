@@ -447,7 +447,6 @@
       "cmd-?": "assistant::ToggleFocus",
       "cmd-alt-s": "workspace::SaveAll",
       "cmd-k m": "language_selector::Toggle",
-      "escape": "workspace::Unfollow",
       "cmd-k cmd-left": ["workspace::ActivatePaneInDirection", "Left"],
       "cmd-k cmd-right": ["workspace::ActivatePaneInDirection", "Right"],
       "cmd-k cmd-up": ["workspace::ActivatePaneInDirection", "Up"],
@@ -523,9 +522,6 @@
   // Custom bindings
   {
     "bindings": {
-      "ctrl-alt-cmd-f": "workspace::FollowNextCollaborator",
-      // TODO: Move this to a dock open action
-      "cmd-shift-c": "collab_panel::ToggleFocus",
       "cmd-alt-i": "zed::DebugElements",
       "ctrl-:": "editor::ToggleInlayHints"
     }
@@ -572,31 +568,6 @@
     "context": "ProjectPanel && not_editing",
     "bindings": {
       "space": "project_panel::Open"
-    }
-  },
-  {
-    "context": "CollabPanel && not_editing",
-    "bindings": {
-      "ctrl-backspace": "collab_panel::Remove",
-      "space": "menu::Confirm"
-    }
-  },
-  {
-    "context": "(CollabPanel && editing) > Editor",
-    "bindings": {
-      "space": "collab_panel::InsertSpace"
-    }
-  },
-  {
-    "context": "ChannelModal",
-    "bindings": {
-      "tab": "channel_modal::ToggleMode"
-    }
-  },
-  {
-    "context": "ChannelModal > Picker > Editor",
-    "bindings": {
-      "tab": "channel_modal::ToggleMode"
     }
   },
   {

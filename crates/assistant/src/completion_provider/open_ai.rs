@@ -4,20 +4,19 @@ use crate::{
 use anyhow::{anyhow, Result};
 use editor::{Editor, EditorElement, EditorStyle};
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
-use gpui::{AnyView, AppContext, FontStyle, FontWeight, Task, TextStyle, View, WhiteSpace};
+use gpui::{AppContext, FontStyle, FontWeight, TextStyle, View, WhiteSpace};
 use open_ai::{stream_completion, Request, RequestMessage, Role as OpenAiRole};
 use settings::Settings;
-use std::{env, sync::Arc};
+use std::sync::Arc;
 use theme::ThemeSettings;
 use ui::prelude::*;
-use util::{http::HttpClient, ResultExt};
+use util::http::HttpClient;
 
 pub struct OpenAiCompletionProvider {
     api_key: Option<String>,
     api_url: String,
     default_model: OpenAiModel,
     http_client: Arc<dyn HttpClient>,
-    settings_version: usize,
 }
 
 impl OpenAiCompletionProvider {
@@ -25,70 +24,18 @@ impl OpenAiCompletionProvider {
         default_model: OpenAiModel,
         api_url: String,
         http_client: Arc<dyn HttpClient>,
-        settings_version: usize,
     ) -> Self {
         Self {
             api_key: None,
             api_url,
             default_model,
             http_client,
-            settings_version,
         }
     }
 
-    pub fn update(&mut self, default_model: OpenAiModel, api_url: String, settings_version: usize) {
+    pub fn update(&mut self, default_model: OpenAiModel, api_url: String) {
         self.default_model = default_model;
         self.api_url = api_url;
-        self.settings_version = settings_version;
-    }
-
-    pub fn settings_version(&self) -> usize {
-        self.settings_version
-    }
-
-    pub fn is_authenticated(&self) -> bool {
-        self.api_key.is_some()
-    }
-
-    pub fn authenticate(&self, cx: &AppContext) -> Task<Result<()>> {
-        if self.is_authenticated() {
-            Task::ready(Ok(()))
-        } else {
-            let api_url = self.api_url.clone();
-            cx.spawn(|mut cx| async move {
-                let api_key = if let Ok(api_key) = env::var("OPENAI_API_KEY") {
-                    api_key
-                } else {
-                    let (_, api_key) = cx
-                        .update(|cx| cx.read_credentials(&api_url))?
-                        .await?
-                        .ok_or_else(|| anyhow!("credentials not found"))?;
-                    String::from_utf8(api_key)?
-                };
-                cx.update_global::<CompletionProvider, _>(|provider, _cx| {
-                    if let CompletionProvider::OpenAi(provider) = provider {
-                        provider.api_key = Some(api_key);
-                    }
-                })
-            })
-        }
-    }
-
-    pub fn reset_credentials(&self, cx: &AppContext) -> Task<Result<()>> {
-        let delete_credentials = cx.delete_credentials(&self.api_url);
-        cx.spawn(|mut cx| async move {
-            delete_credentials.await.log_err();
-            cx.update_global::<CompletionProvider, _>(|provider, _cx| {
-                if let CompletionProvider::OpenAi(provider) = provider {
-                    provider.api_key = None;
-                }
-            })
-        })
-    }
-
-    pub fn authentication_prompt(&self, cx: &mut WindowContext) -> AnyView {
-        cx.new_view(|cx| AuthenticationPrompt::new(self.api_url.clone(), cx))
-            .into()
     }
 
     pub fn default_model(&self) -> OpenAiModel {
@@ -194,20 +141,6 @@ struct AuthenticationPrompt {
 }
 
 impl AuthenticationPrompt {
-    fn new(api_url: String, cx: &mut WindowContext) -> Self {
-        Self {
-            api_key: cx.new_view(|cx| {
-                let mut editor = Editor::single_line(cx);
-                editor.set_placeholder_text(
-                    "sk-000000000000000000000000000000000000000000000000",
-                    cx,
-                );
-                editor
-            }),
-            api_url,
-        }
-    }
-
     fn save_api_key(&mut self, _: &menu::Confirm, cx: &mut ViewContext<Self>) {
         let api_key = self.api_key.read(cx).text(cx);
         if api_key.is_empty() {
