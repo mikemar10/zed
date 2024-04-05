@@ -22,7 +22,6 @@ use language::LanguageSource;
 use project::TaskSourceKind;
 use project_panel::ProjectPanel;
 use quick_action_bar::QuickActionBar;
-use release_channel::{AppCommitSha, ReleaseChannel};
 use rope::Rope;
 use search::project_search::ProjectSearchBar;
 use settings::{
@@ -232,7 +231,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
                                 format!(
                                     "Installed `zed` to {}. You can launch {} from your terminal.",
                                     path.to_string_lossy(),
-                                    ReleaseChannel::global(cx).display_name()
+                                    "zed"
                                 ),
                             ),
                             cx,
@@ -248,13 +247,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
                     register_zed_scheme(&cx).await?;
                     workspace.update(&mut cx, |workspace, cx| {
                         workspace.show_toast(
-                            Toast::new(
-                                0,
-                                format!(
-                                    "zed:// links will now open in {}.",
-                                    ReleaseChannel::global(cx).display_name()
-                                ),
-                            ),
+                            Toast::new(0, format!("zed:// links will now open in {}.", "zed")),
                             cx,
                         )
                     })?;
@@ -396,12 +389,10 @@ fn initialize_pane(workspace: &mut Workspace, pane: &View<Pane>, cx: &mut ViewCo
 }
 
 fn about(_: &mut Workspace, _: &About, cx: &mut gpui::ViewContext<Workspace>) {
-    let release_channel = ReleaseChannel::global(cx).display_name();
     let version = env!("CARGO_PKG_VERSION");
-    let message = format!("{release_channel} {version}");
-    let detail = AppCommitSha::try_global(cx).map(|sha| sha.0.clone());
+    let message = format!("git {version}");
 
-    let prompt = cx.prompt(PromptLevel::Info, &message, detail.as_deref(), &["OK"]);
+    let prompt = cx.prompt(PromptLevel::Info, &message, None, &["OK"]);
     cx.foreground_executor()
         .spawn(async {
             prompt.await.ok();
@@ -2950,7 +2941,6 @@ mod tests {
 
             state.build_window_options = build_window_options;
             theme::init(theme::LoadThemes::JustBase, cx);
-            channel::init(&app_state.client, app_state.user_store.clone(), cx);
             notifications::init(app_state.client.clone(), app_state.user_store.clone(), cx);
             workspace::init(app_state.clone(), cx);
             Project::init_settings(cx);

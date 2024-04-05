@@ -21,7 +21,6 @@ clock.workspace = true
 collections.workspace = true
 gpui.workspace = true
 util.workspace = true
-release_channel.workspace = true
 rpc.workspace = true
 text.workspace = true
 settings.workspace = true

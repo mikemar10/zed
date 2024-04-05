@@ -213,18 +213,6 @@ impl SettingsStore {
                 user_values_stack = vec![user_settings];
             }
 
-            if let Some(release_settings) = &self
-                .raw_user_settings
-                .get(release_channel::RELEASE_CHANNEL.dev_name())
-            {
-                if let Some(release_settings) = setting_value
-                    .deserialize_setting(release_settings)
-                    .log_err()
-                {
-                    user_values_stack.push(release_settings);
-                }
-            }
-
             if let Some(setting) = setting_value
                 .load_setting(&default_settings, &user_values_stack, cx)
                 .context("A default setting must be added to the `default.json` file")
@@ -565,19 +553,6 @@ impl SettingsStore {
             {
                 user_settings_stack.push(user_settings);
                 paths_stack.push(None);
-            }
-
-            if let Some(release_settings) = &self
-                .raw_user_settings
-                .get(release_channel::RELEASE_CHANNEL.dev_name())
-            {
-                if let Some(release_settings) = setting_value
-                    .deserialize_setting(release_settings)
-                    .log_err()
-                {
-                    user_settings_stack.push(release_settings);
-                    paths_stack.push(None);
-                }
             }
 
             // If the global settings file changed, reload the global value for the field.

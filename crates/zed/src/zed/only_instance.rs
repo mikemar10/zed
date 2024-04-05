@@ -5,31 +5,18 @@ use std::{
     time::Duration,
 };
 
-use release_channel::ReleaseChannel;
-
 const LOCALHOST: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(10);
 const RECEIVE_TIMEOUT: Duration = Duration::from_millis(35);
 const SEND_TIMEOUT: Duration = Duration::from_millis(20);
 
 fn address() -> SocketAddr {
-    let port = match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => 43737,
-        ReleaseChannel::Preview => 43738,
-        ReleaseChannel::Stable => 43739,
-        ReleaseChannel::Nightly => 43740,
-    };
-
+    let port = 43737;
     SocketAddr::V4(SocketAddrV4::new(LOCALHOST, port))
 }
 
 fn instance_handshake() -> &'static str {
-    match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Zed Editor Dev Instance Running",
-        ReleaseChannel::Nightly => "Zed Editor Nightly Instance Running",
-        ReleaseChannel::Preview => "Zed Editor Preview Instance Running",
-        ReleaseChannel::Stable => "Zed Editor Stable Instance Running",
-    }
+    "Zed Editor Dev Instance Running"
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +26,7 @@ pub enum IsOnlyInstance {
 }
 
 pub fn ensure_only_instance() -> IsOnlyInstance {
-    if *db::ZED_STATELESS || *release_channel::RELEASE_CHANNEL == ReleaseChannel::Dev {
+    if *db::ZED_STATELESS {
         return IsOnlyInstance::Yes;
     }
 

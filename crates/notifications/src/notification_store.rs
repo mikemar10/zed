@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
-use channel::{ChannelMessage, ChannelMessageId, ChannelStore};
-use client::{ChannelId, Client, UserStore};
-use collections::HashMap;
+use client::{Client, UserStore};
 use db::smol::stream::StreamExt;
 use gpui::{
     AppContext, AsyncAppContext, Context as _, EventEmitter, Global, Model, ModelContext, Task,
@@ -24,8 +22,6 @@ impl Global for GlobalNotificationStore {}
 pub struct NotificationStore {
     client: Arc<Client>,
     user_store: Model<UserStore>,
-    channel_messages: HashMap<u64, ChannelMessage>,
-    channel_store: Model<ChannelStore>,
     notifications: SumTree<NotificationEntry>,
     loaded_all_notifications: bool,
     _watch_connection_status: Task<Option<()>>,
@@ -106,10 +102,8 @@ impl NotificationStore {
         });
 
         Self {
-            channel_store: ChannelStore::global(cx),
             notifications: Default::default(),
             loaded_all_notifications: false,
-            channel_messages: Default::default(),
             _watch_connection_status: watch_connection_status,
             _subscriptions: vec![
                 client.add_message_handler(cx.weak_model(), Self::handle_new_notification),
@@ -126,10 +120,6 @@ impl NotificationStore {
 
     pub fn unread_notification_count(&self) -> usize {
         self.notifications.summary().unread_count
-    }
-
-    pub fn channel_message_for_id(&self, id: u64) -> Option<&ChannelMessage> {
-        self.channel_messages.get(&id)
     }
 
     // Get the nth newest notification.
@@ -196,7 +186,6 @@ impl NotificationStore {
 
     fn handle_connect(&mut self, cx: &mut ModelContext<Self>) -> Option<Task<Result<()>>> {
         self.notifications = Default::default();
-        self.channel_messages = Default::default();
         cx.notify();
         self.load_more_notifications(true, cx)
     }
@@ -242,9 +231,7 @@ impl NotificationStore {
         options: AddNotificationsOptions,
         mut cx: AsyncAppContext,
     ) -> Result<()> {
-        let mut user_ids = Vec::new();
-        let mut message_ids = Vec::new();
-
+        let user_ids = Vec::new();
         let notifications = notifications
             .into_iter()
             .filter_map(|message| {
@@ -262,44 +249,12 @@ impl NotificationStore {
             return Ok(());
         }
 
-        for entry in &notifications {
-            match entry.notification {
-                Notification::ChannelInvitation { inviter_id, .. } => {
-                    user_ids.push(inviter_id);
-                }
-                Notification::ContactRequest {
-                    sender_id: requester_id,
-                } => {
-                    user_ids.push(requester_id);
-                }
-                Notification::ContactRequestAccepted {
-                    responder_id: contact_id,
-                } => {
-                    user_ids.push(contact_id);
-                }
-                Notification::ChannelMessageMention {
-                    sender_id,
-                    message_id,
-                    ..
-                } => {
-                    user_ids.push(sender_id);
-                    message_ids.push(message_id);
-                }
-            }
-        }
-
-        let (user_store, channel_store) = this.read_with(&cx, |this, _| {
-            (this.user_store.clone(), this.channel_store.clone())
-        })?;
+        let user_store = this.read_with(&cx, |this, _| this.user_store.clone())?;
 
         user_store
             .update(&mut cx, |store, cx| store.get_users(user_ids, cx))?
             .await?;
-        let messages = channel_store
-            .update(&mut cx, |store, cx| {
-                store.fetch_channel_messages(message_ids, cx)
-            })?
-            .await?;
+
         this.update(&mut cx, |this, cx| {
             if options.clear_old {
                 cx.emit(NotificationEvent::NotificationsUpdated {
@@ -307,22 +262,12 @@ impl NotificationStore {
                     new_count: 0,
                 });
                 this.notifications = SumTree::default();
-                this.channel_messages.clear();
                 this.loaded_all_notifications = false;
             }
 
             if options.includes_first {
                 this.loaded_all_notifications = true;
             }
-
-            this.channel_messages
-                .extend(messages.into_iter().filter_map(|message| {
-                    if let ChannelMessageId::Saved(id) = message.id {
-                        Some((id, message))
-                    } else {
-                        None
-                    }
-                }));
 
             this.splice_notifications(
                 notifications
@@ -394,31 +339,6 @@ impl NotificationStore {
             old_range,
             new_count,
         });
-    }
-
-    pub fn respond_to_notification(
-        &mut self,
-        notification: Notification,
-        response: bool,
-        cx: &mut ModelContext<Self>,
-    ) {
-        match notification {
-            Notification::ContactRequest { sender_id } => {
-                self.user_store
-                    .update(cx, |store, cx| {
-                        store.respond_to_contact_request(sender_id, response, cx)
-                    })
-                    .detach();
-            }
-            Notification::ChannelInvitation { channel_id, .. } => {
-                self.channel_store
-                    .update(cx, |store, cx| {
-                        store.respond_to_channel_invite(ChannelId(channel_id), response, cx)
-                    })
-                    .detach();
-            }
-            _ => {}
-        }
     }
 }
 

@@ -12,8 +12,6 @@ pub use sqlez;
 pub use sqlez_macros;
 pub use util::paths::DB_DIR;
 
-use release_channel::ReleaseChannel;
-pub use release_channel::RELEASE_CHANNEL;
 use sqlez::domain::Migrator;
 use sqlez::thread_safe_connection::ThreadSafeConnection;
 use sqlez_macros::sql;
@@ -46,16 +44,12 @@ lazy_static::lazy_static! {
 /// This will retry a couple times if there are failures. If opening fails once, the db directory
 /// is moved to a backup folder and a new one is created. If that fails, a shared in memory db is created.
 /// In either case, static variables are set so that the user can be notified.
-pub async fn open_db<M: Migrator + 'static>(
-    db_dir: &Path,
-    release_channel: &ReleaseChannel,
-) -> ThreadSafeConnection<M> {
+pub async fn open_db<M: Migrator + 'static>(db_dir: &Path) -> ThreadSafeConnection<M> {
     if *ZED_STATELESS {
         return open_fallback_db().await;
     }
 
-    let release_channel_name = release_channel.dev_name();
-    let main_db_dir = db_dir.join(Path::new(&format!("0-{}", release_channel_name)));
+    let main_db_dir = db_dir.join(Path::new(&format!("0-{}", "git")));
 
     let connection = maybe!(async {
         smol::fs::create_dir_all(&main_db_dir)
@@ -145,7 +139,7 @@ macro_rules! define_connection {
 
         #[cfg(not(any(test, feature = "test-support")))]
         $crate::lazy_static::lazy_static! {
-            pub static ref $id: $t = $t($crate::smol::block_on($crate::open_db(&$crate::DB_DIR, &$crate::RELEASE_CHANNEL)));
+            pub static ref $id: $t = $t($crate::smol::block_on($crate::open_db(&$crate::DB_DIR)));
         }
     };
     (pub static ref $id:ident: $t:ident<$($d:ty),+> = $migrations:expr;) => {
@@ -176,7 +170,7 @@ macro_rules! define_connection {
 
         #[cfg(not(any(test, feature = "test-support")))]
         $crate::lazy_static::lazy_static! {
-            pub static ref $id: $t = $t($crate::smol::block_on($crate::open_db(&$crate::DB_DIR, &$crate::RELEASE_CHANNEL)));
+            pub static ref $id: $t = $t($crate::smol::block_on($crate::open_db(&$crate::DB_DIR)));
         }
     };
 }
@@ -223,7 +217,7 @@ mod tests {
             .prefix("DbTests")
             .tempdir()
             .unwrap();
-        let _bad_db = open_db::<BadDB>(tempdir.path(), &release_channel::ReleaseChannel::Dev).await;
+        let _bad_db = open_db::<BadDB>(tempdir.path()).await;
     }
 
     /// Test that DB exists but corrupted (causing recreate)
@@ -260,13 +254,11 @@ mod tests {
             .tempdir()
             .unwrap();
         {
-            let corrupt_db =
-                open_db::<CorruptedDB>(tempdir.path(), &release_channel::ReleaseChannel::Dev).await;
+            let corrupt_db = open_db::<CorruptedDB>(tempdir.path()).await;
             assert!(corrupt_db.persistent());
         }
 
-        let good_db =
-            open_db::<GoodDB>(tempdir.path(), &release_channel::ReleaseChannel::Dev).await;
+        let good_db = open_db::<GoodDB>(tempdir.path()).await;
         assert!(
             good_db.select_row::<usize>("SELECT * FROM test2").unwrap()()
                 .unwrap()
@@ -309,8 +301,7 @@ mod tests {
             .unwrap();
         {
             // Setup the bad database
-            let corrupt_db =
-                open_db::<CorruptedDB>(tempdir.path(), &release_channel::ReleaseChannel::Dev).await;
+            let corrupt_db = open_db::<CorruptedDB>(tempdir.path()).await;
             assert!(corrupt_db.persistent());
         }
 
@@ -319,10 +310,7 @@ mod tests {
         for _ in 0..10 {
             let tmp_path = tempdir.path().to_path_buf();
             let guard = thread::spawn(move || {
-                let good_db = smol::block_on(open_db::<GoodDB>(
-                    tmp_path.as_path(),
-                    &release_channel::ReleaseChannel::Dev,
-                ));
+                let good_db = smol::block_on(open_db::<GoodDB>(tmp_path.as_path()));
                 assert!(
                     good_db.select_row::<usize>("SELECT * FROM test2").unwrap()()
                         .unwrap()

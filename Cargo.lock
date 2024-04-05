@@ -1137,28 +1137,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "channel"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "client",
- "clock",
- "collections",
- "futures 0.3.28",
- "gpui",
- "language",
- "log",
- "rand 0.8.5",
- "release_channel",
- "rpc",
- "settings",
- "sum_tree",
- "text",
- "time",
- "util",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1298,7 +1276,6 @@ dependencies = [
  "parking_lot",
  "postage",
  "rand 0.8.5",
- "release_channel",
  "rpc",
  "schemars",
  "serde",
@@ -1860,7 +1837,6 @@ dependencies = [
  "indoc",
  "lazy_static",
  "log",
- "release_channel",
  "smol",
  "sqlez",
  "sqlez_macros",
@@ -2098,7 +2074,6 @@ dependencies = [
  "parking_lot",
  "project",
  "rand 0.8.5",
- "release_channel",
  "rpc",
  "schemars",
  "serde",
@@ -2424,36 +2399,6 @@ name = "feature_flags"
 version = "0.1.0"
 dependencies = [
  "gpui",
-]
-
-[[package]]
-name = "feedback"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitflags 2.4.2",
- "client",
- "db",
- "editor",
- "futures 0.3.28",
- "gpui",
- "human_bytes",
- "isahc",
- "language",
- "log",
- "menu",
- "project",
- "regex",
- "release_channel",
- "serde",
- "serde_derive",
- "serde_json",
- "smol",
- "sysinfo",
- "ui",
- "urlencoding",
- "util",
- "workspace",
 ]
 
 [[package]]
@@ -3312,12 +3257,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d897f394bad6a705d5f4104762e116a75639e470d80901eed05a860a95cb1904"
 
 [[package]]
-name = "human_bytes"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91f255a4535024abf7640cb288260811fc14794f62b063652ed349f9a6c2348e"
-
-[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3799,7 +3738,6 @@ dependencies = [
  "language",
  "lsp",
  "project",
- "release_channel",
  "serde_json",
  "settings",
  "theme",
@@ -4075,7 +4013,6 @@ dependencies = [
  "lsp-types",
  "parking_lot",
  "postage",
- "release_channel",
  "serde",
  "serde_json",
  "smol",
@@ -4452,7 +4389,6 @@ name = "notifications"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "channel",
  "client",
  "collections",
  "db",
@@ -5273,7 +5209,6 @@ dependencies = [
  "pretty_assertions",
  "rand 0.8.5",
  "regex",
- "release_channel",
  "rpc",
  "schemars",
  "serde",
@@ -5332,7 +5267,6 @@ dependencies = [
  "ordered-float",
  "picker",
  "project",
- "release_channel",
  "serde_json",
  "settings",
  "theme",
@@ -5703,14 +5637,6 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
-name = "release_channel"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "once_cell",
-]
 
 [[package]]
 name = "resvg"
@@ -6232,7 +6158,6 @@ dependencies = [
  "indoc",
  "lazy_static",
  "pretty_assertions",
- "release_channel",
  "rust-embed",
  "schemars",
  "serde",
@@ -8131,7 +8056,6 @@ dependencies = [
  "nvim-rs",
  "parking_lot",
  "regex",
- "release_channel",
  "schemars",
  "search",
  "serde",
@@ -9643,7 +9567,6 @@ dependencies = [
  "assistant",
  "backtrace",
  "breadcrumbs",
- "channel",
  "chrono",
  "clap 4.4.4",
  "cli",
@@ -9658,7 +9581,6 @@ dependencies = [
  "env_logger",
  "extension",
  "extensions_ui",
- "feedback",
  "file_finder",
  "fs",
  "futures 0.3.28",
@@ -9686,7 +9608,6 @@ dependencies = [
  "project_symbols",
  "quick_action_bar",
  "recent_projects",
- "release_channel",
  "rope",
  "search",
  "serde",

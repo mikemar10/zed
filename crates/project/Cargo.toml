@@ -68,7 +68,6 @@ fs = { workspace = true, features = ["test-support"] }
 git2.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
 language = { workspace = true, features = ["test-support"] }
-release_channel.workspace = true
 lsp = { workspace = true, features = ["test-support"] }
 prettier = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true

@@ -653,11 +653,9 @@ impl LanguageServer {
                 uri: root_uri,
                 name: Default::default(),
             }]),
-            client_info: release_channel::ReleaseChannel::try_global(cx).map(|release_channel| {
-                ClientInfo {
-                    name: release_channel.display_name().to_string(),
-                    version: Some(release_channel::AppVersion::global(cx).to_string()),
-                }
+            client_info: Some(ClientInfo {
+                name: "git".to_string(),
+                version: Some("git".to_string()),
             }),
             locale: None,
         };
@@ -1339,9 +1337,6 @@ mod tests {
 
     #[gpui::test]
     async fn test_fake(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            release_channel::init("0.0.0", cx);
-        });
         let (server, mut fake) = FakeLanguageServer::new(
             LanguageServerBinary {
                 path: "path/to/language-server".into(),

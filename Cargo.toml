@@ -4,7 +4,6 @@ members = [
     "crates/assets",
     "crates/assistant",
     "crates/breadcrumbs",
-    "crates/channel",
     "crates/cli",
     "crates/client",
     "crates/clock",
@@ -19,7 +18,6 @@ members = [
     "crates/extension_cli",
     "crates/extensions_ui",
     "crates/feature_flags",
-    "crates/feedback",
     "crates/file_finder",
     "crates/fs",
     "crates/fsevent",
@@ -54,7 +52,6 @@ members = [
     "crates/recent_projects",
     "crates/refineable",
     "crates/refineable/derive_refineable",
-    "crates/release_channel",
     "crates/rich_text",
     "crates/rope",
     "crates/rpc",
@@ -105,7 +102,6 @@ assets = { path = "crates/assets" }
 assistant = { path = "crates/assistant" }
 base64 = "0.13"
 breadcrumbs = { path = "crates/breadcrumbs" }
-channel = { path = "crates/channel" }
 cli = { path = "crates/cli" }
 client = { path = "crates/client" }
 clock = { path = "crates/clock" }
@@ -119,7 +115,6 @@ editor = { path = "crates/editor" }
 extension = { path = "crates/extension" }
 extensions_ui = { path = "crates/extensions_ui" }
 feature_flags = { path = "crates/feature_flags" }
-feedback = { path = "crates/feedback" }
 file_finder = { path = "crates/file_finder" }
 fs = { path = "crates/fs" }
 fsevent = { path = "crates/fsevent" }
@@ -155,7 +150,6 @@ project_panel = { path = "crates/project_panel" }
 project_symbols = { path = "crates/project_symbols" }
 quick_action_bar = { path = "crates/quick_action_bar" }
 recent_projects = { path = "crates/recent_projects" }
-release_channel = { path = "crates/release_channel" }
 rich_text = { path = "crates/rich_text" }
 rope = { path = "crates/rope" }
 rpc = { path = "crates/rpc" }

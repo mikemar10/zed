@@ -22,7 +22,6 @@ use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use postage::watch;
 use rand::prelude::*;
-use release_channel::{AppVersion, ReleaseChannel};
 use rpc::proto::{AnyTypedEnvelope, EntityMessage, EnvelopedMessage, PeerId, RequestMessage};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -946,21 +945,12 @@ impl Client {
         self.establish_websocket_connection(credentials, cx)
     }
 
-    async fn get_rpc_url(
-        http: Arc<HttpClientWithUrl>,
-        release_channel: Option<ReleaseChannel>,
-    ) -> Result<Url> {
+    async fn get_rpc_url(http: Arc<HttpClientWithUrl>) -> Result<Url> {
         if let Some(url) = &*ZED_RPC_URL {
             return Url::parse(url).context("invalid rpc url");
         }
 
-        let mut url = http.build_url("/rpc");
-        if let Some(preview_param) =
-            release_channel.and_then(|channel| channel.release_query_param())
-        {
-            url += "?";
-            url += preview_param;
-        }
+        let url = http.build_url("/rpc");
         let response = http.get(&url, Default::default(), false).await?;
         let collab_url = if response.status().is_redirection() {
             response
@@ -985,27 +975,12 @@ impl Client {
         credentials: &Credentials,
         cx: &AsyncAppContext,
     ) -> Task<Result<Connection, EstablishConnectionError>> {
-        let release_channel = cx
-            .update(|cx| ReleaseChannel::try_global(cx))
-            .ok()
-            .flatten();
-        let app_version = cx
-            .update(|cx| AppVersion::global(cx).to_string())
-            .ok()
-            .unwrap_or_default();
-
         let request = Request::builder()
             .header("Authorization", credentials.authorization_header())
-            .header("x-zed-protocol-version", rpc::PROTOCOL_VERSION)
-            .header("x-zed-app-version", app_version)
-            .header(
-                "x-zed-release-channel",
-                release_channel.map(|r| r.dev_name()).unwrap_or("unknown"),
-            );
-
+            .header("x-zed-protocol-version", rpc::PROTOCOL_VERSION);
         let http = self.http.clone();
         cx.background_executor().spawn(async move {
-            let mut rpc_url = Self::get_rpc_url(http, release_channel).await?;
+            let mut rpc_url = Self::get_rpc_url(http).await?;
             let rpc_host = rpc_url
                 .host_str()
                 .zip(rpc_url.port_or_known_default())
@@ -1177,7 +1152,7 @@ impl Client {
 
         // Use the collab server's admin API to retrieve the id
         // of the impersonated user.
-        let mut url = Self::get_rpc_url(http.clone(), None).await?;
+        let mut url = Self::get_rpc_url(http.clone()).await?;
         url.set_path("/user");
         url.set_query(Some(&format!("github_login={login}")));
         let request = Request::get(url.as_str())

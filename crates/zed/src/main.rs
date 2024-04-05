@@ -23,7 +23,6 @@ use assets::Assets;
 use mimalloc::MiMalloc;
 use node_runtime::RealNodeRuntime;
 use parking_lot::Mutex;
-use release_channel::{AppCommitSha, ReleaseChannel, RELEASE_CHANNEL};
 use serde::{Deserialize, Serialize};
 use settings::{
     default_settings, handle_settings_file_changes, watch_config_file, Settings, SettingsStore,
@@ -113,11 +112,6 @@ fn main() {
     });
 
     app.run(move |cx| {
-        release_channel::init(env!("CARGO_PKG_VERSION"), cx);
-        if let Some(build_sha) = option_env!("ZED_COMMIT_SHA") {
-            AppCommitSha::set_global(AppCommitSha(build_sha.into()), cx);
-        }
-
         SystemAppearance::init(cx);
         OpenListener::set_global(listener.clone(), cx);
 
@@ -214,7 +208,6 @@ fn main() {
         project_symbols::init(cx);
         project_panel::init(Assets, cx);
         tasks_ui::init(cx);
-        channel::init(&client, user_store.clone(), cx);
         search::init(cx);
         vim::init(cx);
         terminal_view::init(cx);
@@ -224,7 +217,6 @@ fn main() {
         theme_selector::init(cx);
         language_tools::init(cx);
         notifications::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-        feedback::init(cx);
         markdown_preview::init(cx);
         welcome::init(cx);
         extensions_ui::init(cx);
@@ -492,7 +484,6 @@ struct Panic {
     location_data: Option<LocationData>,
     backtrace: Vec<String>,
     app_version: String,
-    release_channel: String,
     os_name: String,
     os_version: Option<String>,
     architecture: String,
@@ -532,21 +523,6 @@ fn init_panic_hook(app: &App, installation_id: Option<String>, session_id: Strin
             .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.clone()))
             .unwrap_or_else(|| "Box<Any>".to_string());
 
-        if *release_channel::RELEASE_CHANNEL == ReleaseChannel::Dev {
-            let location = info.location().unwrap();
-            let backtrace = Backtrace::new();
-            eprintln!(
-                "Thread {:?} panicked with {:?} at {}:{}:{}\n{:?}",
-                thread_name,
-                payload,
-                location.file(),
-                location.line(),
-                location.column(),
-                backtrace,
-            );
-            std::process::exit(-1);
-        }
-
         let app_version = if let Some(version) = app_metadata.app_version {
             version.to_string()
         } else {
@@ -583,7 +559,6 @@ fn init_panic_hook(app: &App, installation_id: Option<String>, session_id: Strin
                 line: location.line(),
             }),
             app_version: app_version.to_string(),
-            release_channel: RELEASE_CHANNEL.display_name().into(),
             os_name: app_metadata.os_name.into(),
             os_version: app_metadata
                 .os_version

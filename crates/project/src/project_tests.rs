@@ -4445,7 +4445,6 @@ fn init_test(cx: &mut gpui::TestAppContext) {
     cx.update(|cx| {
         let settings_store = SettingsStore::test(cx);
         cx.set_global(settings_store);
-        release_channel::init("0.0.0", cx);
         language::init(cx);
         Project::init_settings(cx);
     });

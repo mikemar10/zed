@@ -164,7 +164,6 @@ pub fn app_menus() -> Vec<Menu<'static>> {
             items: vec![
                 MenuItem::action("View Dependency Licenses", super::OpenLicenses),
                 MenuItem::action("Show Welcome", workspace::Welcome),
-                MenuItem::action("Give Feedback...", feedback::GiveFeedback),
                 MenuItem::separator(),
                 MenuItem::action(
                     "Documentation",
