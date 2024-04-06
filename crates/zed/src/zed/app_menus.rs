@@ -21,7 +21,6 @@ pub fn app_menus() -> Vec<Menu<'static>> {
                         MenuItem::action("Select Theme...", theme_selector::Toggle::default()),
                     ],
                 }),
-                MenuItem::action("Extensions", extensions_ui::Extensions),
                 MenuItem::action("Install CLI", install_cli::Install),
                 MenuItem::separator(),
                 MenuItem::action("Hide Zed", super::Hide),

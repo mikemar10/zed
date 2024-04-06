@@ -1,16 +1,12 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::StreamExt;
 use gpui::AsyncAppContext;
 pub use language::*;
 use lsp::LanguageServerBinary;
-use smol::fs::{self, File};
-use std::{any::Any, env::consts, path::PathBuf, sync::Arc};
-use util::{
-    fs::remove_matching,
-    github::{latest_github_release, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use smol::fs;
+use std::{path::PathBuf, sync::Arc};
+use util::{maybe, ResultExt};
 
 pub struct CLspAdapter;
 
@@ -20,6 +16,8 @@ impl super::LspAdapter for CLspAdapter {
         LanguageServerName("clangd".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -44,6 +42,7 @@ impl super::LspAdapter for CLspAdapter {
         };
         Ok(Box::new(version) as Box<_>)
     }
+    */
 
     async fn check_if_user_installed(
         &self,
@@ -59,6 +58,8 @@ impl super::LspAdapter for CLspAdapter {
         })
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_server_binary(
         &self,
         version: Box<dyn 'static + Send + Any>,
@@ -104,6 +105,7 @@ impl super::LspAdapter for CLspAdapter {
             arguments: vec![],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

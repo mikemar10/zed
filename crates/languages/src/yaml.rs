@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::StreamExt;
 use gpui::AppContext;
@@ -10,7 +10,6 @@ use node_runtime::NodeRuntime;
 use serde_json::Value;
 use smol::fs;
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
@@ -39,6 +38,8 @@ impl LspAdapter for YamlLspAdapter {
         LanguageServerName("yaml-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -77,7 +78,7 @@ impl LspAdapter for YamlLspAdapter {
             arguments: server_binary_arguments(&server_path),
         })
     }
-
+    */
     async fn cached_server_binary(
         &self,
         container_dir: PathBuf,

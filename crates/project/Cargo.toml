@@ -14,7 +14,6 @@ doctest = false
 
 [features]
 test-support = [
-    "client/test-support",
     "language/test-support",
     "settings/test-support",
     "text/test-support",
@@ -27,7 +26,6 @@ test-support = [
 aho-corasick = "1.1"
 anyhow.workspace = true
 async-trait.workspace = true
-client.workspace = true
 clock.workspace = true
 collections.workspace = true
 fs.workspace = true
@@ -46,7 +44,6 @@ prettier.workspace = true
 worktree.workspace = true
 rand.workspace = true
 regex.workspace = true
-rpc.workspace = true
 schemars.workspace = true
 task.workspace = true
 serde.workspace = true
@@ -61,7 +58,6 @@ util.workspace = true
 which.workspace = true
 
 [dev-dependencies]
-client = { workspace = true, features = ["test-support"] }
 collections = { workspace = true, features = ["test-support"] }
 env_logger.workspace = true
 fs = { workspace = true, features = ["test-support"] }
@@ -72,7 +68,6 @@ lsp = { workspace = true, features = ["test-support"] }
 prettier = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true
 worktree = { workspace = true, features = ["test-support"] }
-rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
 unindent.workspace = true
 util = { workspace = true, features = ["test-support"] }

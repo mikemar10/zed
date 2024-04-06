@@ -1,10 +1,8 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
 use node_runtime::NodeRuntime;
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
@@ -33,6 +31,8 @@ impl LspAdapter for PythonLspAdapter {
         LanguageServerName("pyright".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -67,6 +67,7 @@ impl LspAdapter for PythonLspAdapter {
             arguments: server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

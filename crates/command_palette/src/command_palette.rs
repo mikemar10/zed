@@ -4,7 +4,6 @@ use std::{
     time::Duration,
 };
 
-use client::parse_zed_link;
 use collections::HashMap;
 use command_palette_hooks::{
     CommandInterceptResult, CommandPaletteFilter, CommandPaletteInterceptor,
@@ -20,8 +19,6 @@ use postage::{sink::Sink, stream::Stream};
 use ui::{h_flex, prelude::*, v_flex, HighlightedLabel, KeyBinding, ListItem, ListItemSpacing};
 use util::ResultExt;
 use workspace::{ModalView, Workspace};
-use zed_actions::OpenZedUrl;
-
 actions!(command_palette, [Toggle]);
 
 pub fn init(cx: &mut AppContext) {
@@ -165,16 +162,8 @@ impl CommandPaletteDelegate {
     ) {
         self.updating_matches.take();
 
-        let mut intercept_result = CommandPaletteInterceptor::try_global(cx)
+        let intercept_result = CommandPaletteInterceptor::try_global(cx)
             .and_then(|interceptor| interceptor.intercept(&query, cx));
-
-        if parse_zed_link(&query).is_some() {
-            intercept_result = Some(CommandInterceptResult {
-                action: OpenZedUrl { url: query.clone() }.boxed_clone(),
-                string: query.clone(),
-                positions: vec![],
-            })
-        }
 
         if let Some(CommandInterceptResult {
             action,

@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
-use async_compression::futures::bufread::GzipDecoder;
-use async_tar::Archive;
+
 use async_trait::async_trait;
 use collections::HashMap;
 use gpui::AppContext;
@@ -10,18 +9,13 @@ use node_runtime::NodeRuntime;
 use project::project_settings::ProjectSettings;
 use serde_json::{json, Value};
 use settings::Settings;
-use smol::{fs, io::BufReader, stream::StreamExt};
+use smol::{fs, stream::StreamExt};
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use util::{
-    fs::remove_matching,
-    github::{build_tarball_url, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use util::{maybe, ResultExt};
 
 fn typescript_server_binary_arguments(server_path: &Path) -> Vec<OsString> {
     vec![server_path.into(), "--stdio".into()]
@@ -44,10 +38,13 @@ impl TypeScriptLspAdapter {
     }
 }
 
+// TODO disabled for now
+/*
 struct TypeScriptVersions {
     typescript_version: String,
     server_version: String,
 }
+*/
 
 #[async_trait(?Send)]
 impl LspAdapter for TypeScriptLspAdapter {
@@ -55,6 +52,8 @@ impl LspAdapter for TypeScriptLspAdapter {
         LanguageServerName("typescript-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -109,6 +108,7 @@ impl LspAdapter for TypeScriptLspAdapter {
             arguments: typescript_server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,
@@ -229,7 +229,7 @@ pub struct EsLintLspAdapter {
 }
 
 impl EsLintLspAdapter {
-    const CURRENT_VERSION: &'static str = "release/2.4.4";
+    //const CURRENT_VERSION: &'static str = "release/2.4.4";
 
     const SERVER_PATH: &'static str = "vscode-eslint/server/out/eslintServer.js";
     const SERVER_NAME: &'static str = "eslint";
@@ -302,6 +302,8 @@ impl LspAdapter for EsLintLspAdapter {
         LanguageServerName(Self::SERVER_NAME.into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _delegate: &dyn LspAdapterDelegate,
@@ -356,6 +358,7 @@ impl LspAdapter for EsLintLspAdapter {
             arguments: eslint_server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

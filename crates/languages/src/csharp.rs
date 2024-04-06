@@ -1,16 +1,14 @@
-use anyhow::{anyhow, Context, Result};
-use async_compression::futures::bufread::GzipDecoder;
-use async_tar::Archive;
+use anyhow::anyhow;
+
 use async_trait::async_trait;
-use futures::{io::BufReader, StreamExt};
+use futures::StreamExt;
 use language::{LanguageServerName, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
 use smol::fs;
-use std::env::consts::ARCH;
 use std::ffi::OsString;
-use std::{any::Any, path::PathBuf};
-use util::{github::latest_github_release, maybe};
-use util::{github::GitHubLspBinaryVersion, ResultExt};
+use std::path::PathBuf;
+use util::maybe;
+use util::ResultExt;
 
 pub struct OmniSharpAdapter;
 
@@ -20,6 +18,8 @@ impl super::LspAdapter for OmniSharpAdapter {
         LanguageServerName("OmniSharp".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -91,7 +91,7 @@ impl super::LspAdapter for OmniSharpAdapter {
             arguments: server_binary_arguments(),
         })
     }
-
+    */
     async fn cached_server_binary(
         &self,
         container_dir: PathBuf,

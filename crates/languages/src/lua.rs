@@ -1,16 +1,12 @@
-use anyhow::{anyhow, bail, Result};
-use async_compression::futures::bufread::GzipDecoder;
-use async_tar::Archive;
+use anyhow::anyhow;
+
 use async_trait::async_trait;
-use futures::{io::BufReader, StreamExt};
+use futures::StreamExt;
 use language::{LanguageServerName, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
 use smol::fs;
-use std::{any::Any, env::consts, path::PathBuf};
-use util::{
-    github::{latest_github_release, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use std::path::PathBuf;
+use util::{maybe, ResultExt};
 
 #[derive(Copy, Clone)]
 pub struct LuaLspAdapter;
@@ -21,6 +17,8 @@ impl super::LspAdapter for LuaLspAdapter {
         LanguageServerName("lua-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -93,6 +91,7 @@ impl super::LspAdapter for LuaLspAdapter {
             arguments: Vec::new(),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

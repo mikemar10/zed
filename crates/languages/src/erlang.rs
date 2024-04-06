@@ -1,8 +1,7 @@
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
-use std::{any::Any, path::PathBuf};
+use std::path::PathBuf;
 
 pub struct ErlangLspAdapter;
 
@@ -12,6 +11,8 @@ impl LspAdapter for ErlangLspAdapter {
         LanguageServerName("erlang_ls".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -29,6 +30,7 @@ impl LspAdapter for ErlangLspAdapter {
             "erlang_ls must be installed and available in your $PATH"
         ))
     }
+    */
 
     async fn cached_server_binary(
         &self,

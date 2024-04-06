@@ -12,7 +12,7 @@ use gpui::{
 };
 use language::Bias;
 use persistence::TERMINAL_DB;
-use project::{search::SearchQuery, Fs, LocalWorktree, Metadata, Project};
+use project::{search::SearchQuery, Fs, Metadata, Project, Worktree};
 use settings::SettingsStore;
 use terminal::{
     alacritty_terminal::{
@@ -1050,7 +1050,7 @@ fn first_project_directory(workspace: &Workspace, cx: &AppContext) -> Option<Pat
     workspace
         .worktrees(cx)
         .next()
-        .and_then(|worktree_handle| worktree_handle.read(cx).as_local())
+        .and_then(|worktree_handle| Some(worktree_handle.read(cx).as_local()))
         .and_then(get_path_from_wt)
 }
 
@@ -1066,11 +1066,11 @@ fn current_project_directory(workspace: &Workspace, cx: &AppContext) -> Option<P
         .active_entry()
         .and_then(|entry_id| project.worktree_for_entry(entry_id, cx))
         .or_else(|| workspace.worktrees(cx).next())
-        .and_then(|worktree_handle| worktree_handle.read(cx).as_local())
+        .and_then(|worktree_handle| Some(worktree_handle.read(cx).as_local()))
         .and_then(get_path_from_wt)
 }
 
-fn get_path_from_wt(wt: &LocalWorktree) -> Option<PathBuf> {
+fn get_path_from_wt(wt: &Worktree) -> Option<PathBuf> {
     wt.root_entry()
         .filter(|re| re.is_dir())
         .map(|_| wt.abs_path().to_path_buf())
@@ -1242,9 +1242,7 @@ mod tests {
         let entry = cx
             .update(|cx| {
                 wt.update(cx, |wt, cx| {
-                    wt.as_local()
-                        .unwrap()
-                        .create_entry(Path::new(""), is_dir, cx)
+                    wt.as_local().create_entry(Path::new(""), is_dir, cx)
                 })
             })
             .await

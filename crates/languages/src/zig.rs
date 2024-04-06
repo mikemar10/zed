@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Context, Result};
-use async_compression::futures::bufread::GzipDecoder;
-use async_tar::Archive;
+use anyhow::anyhow;
+
 use async_trait::async_trait;
-use futures::{io::BufReader, StreamExt};
+use futures::StreamExt;
 use gpui::AsyncAppContext;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
 use smol::fs;
-use std::env::consts::{ARCH, OS};
-use std::{any::Any, path::PathBuf};
-use util::github::latest_github_release;
+use std::path::PathBuf;
+
 use util::maybe;
-use util::{github::GitHubLspBinaryVersion, ResultExt};
+use util::ResultExt;
 
 pub struct ZlsAdapter;
 
@@ -21,6 +19,8 @@ impl LspAdapter for ZlsAdapter {
         LanguageServerName("zls".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -40,6 +40,7 @@ impl LspAdapter for ZlsAdapter {
 
         Ok(Box::new(version) as Box<_>)
     }
+    */
 
     async fn check_if_user_installed(
         &self,
@@ -55,6 +56,8 @@ impl LspAdapter for ZlsAdapter {
         })
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_server_binary(
         &self,
         version: Box<dyn 'static + Send + Any>,
@@ -90,6 +93,7 @@ impl LspAdapter for ZlsAdapter {
             arguments: vec![],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

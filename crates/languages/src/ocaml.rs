@@ -1,6 +1,5 @@
-use std::{any::Any, ops::Range, path::PathBuf, sync::Arc};
+use std::{ops::Range, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use language::{CodeLabel, LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::{CompletionItemKind, LanguageServerBinary, SymbolKind};
@@ -18,6 +17,8 @@ impl LspAdapter for OCamlLspAdapter {
         LanguageServerName("ocamllsp".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -35,6 +36,7 @@ impl LspAdapter for OCamlLspAdapter {
             "ocamllsp (ocaml-language-server) must be installed manually."
         ))
     }
+    */
 
     async fn cached_server_binary(
         &self,

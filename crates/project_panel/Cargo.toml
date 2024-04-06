@@ -31,11 +31,9 @@ theme.workspace = true
 ui.workspace = true
 unicase.workspace = true
 util.workspace = true
-client.workspace = true
 workspace.workspace = true
 
 [dev-dependencies]
-client = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 language = { workspace = true, features = ["test-support"] }

@@ -12,7 +12,6 @@ mod highlight_map;
 mod language_registry;
 pub mod language_settings;
 mod outline;
-pub mod proto;
 mod syntax_map;
 mod task_context;
 
@@ -39,7 +38,6 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use smol::future::FutureExt as _;
 use std::{
-    any::Any,
     cell::RefCell,
     ffi::OsStr,
     fmt::Debug,
@@ -60,7 +58,6 @@ pub use task_context::{
 };
 use theme::SyntaxTheme;
 use tree_sitter::{self, wasmtime, Query, WasmStore};
-use util::http::HttpClient;
 
 pub use buffer::Operation;
 pub use buffer::*;
@@ -239,7 +236,6 @@ impl CachedLspAdapter {
 #[async_trait]
 pub trait LspAdapterDelegate: Send + Sync {
     fn show_notification(&self, message: &str, cx: &mut AppContext);
-    fn http_client(&self) -> Arc<dyn HttpClient>;
     fn update_status(&self, language: LanguageServerName, status: LanguageServerBinaryStatus);
 
     async fn which(&self, command: &OsStr) -> Option<PathBuf>;
@@ -331,11 +327,13 @@ pub trait LspAdapter: 'static + Send + Sync {
         None
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
     ) -> Result<Box<dyn 'static + Send + Any>>;
-
+    */
     fn will_fetch_server(
         &self,
         _: &Arc<dyn LspAdapterDelegate>,
@@ -352,12 +350,15 @@ pub trait LspAdapter: 'static + Send + Sync {
         None
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_server_binary(
         &self,
         latest_version: Box<dyn 'static + Send + Any>,
         container_dir: PathBuf,
         delegate: &dyn LspAdapterDelegate,
     ) -> Result<LanguageServerBinary>;
+    */
 
     async fn cached_server_binary(
         &self,
@@ -448,13 +449,15 @@ pub trait LspAdapter: 'static + Send + Sync {
 async fn try_fetch_server_binary<L: LspAdapter + 'static + Send + Sync + ?Sized>(
     adapter: &L,
     delegate: &Arc<dyn LspAdapterDelegate>,
-    container_dir: PathBuf,
+    _container_dir: PathBuf,
     cx: &mut AsyncAppContext,
 ) -> Result<LanguageServerBinary> {
     if let Some(task) = adapter.will_fetch_server(delegate, cx) {
         task.await?;
     }
 
+    // TODO disabled for now
+    /*
     let name = adapter.name();
     log::info!("fetching latest version of language server {:?}", name.0);
     delegate.update_status(name.clone(), LanguageServerBinaryStatus::CheckingForUpdate);
@@ -470,6 +473,8 @@ async fn try_fetch_server_binary<L: LspAdapter + 'static + Send + Sync + ?Sized>
 
     delegate.update_status(name.clone(), LanguageServerBinaryStatus::None);
     binary
+    */
+    Err(anyhow!("TODO lsp server fetching temporarily disabled"))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1477,6 +1482,8 @@ impl LspAdapter for FakeLspAdapter {
         async move { Ok(self.language_server_binary.clone()) }.boxed_local()
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -1492,6 +1499,7 @@ impl LspAdapter for FakeLspAdapter {
     ) -> Result<LanguageServerBinary> {
         unreachable!();
     }
+    */
 
     async fn cached_server_binary(
         &self,

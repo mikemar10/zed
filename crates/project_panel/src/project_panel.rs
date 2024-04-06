@@ -1,6 +1,5 @@
 pub mod file_associations;
 mod project_panel_settings;
-use client::{ErrorCode, ErrorExt};
 use settings::Settings;
 
 use db::kvp::KEY_VALUE_STORE;
@@ -36,7 +35,6 @@ use unicase::UniCase;
 use util::{maybe, NumericPrefixWithSuffix, ResultExt, TryFutureExt};
 use workspace::{
     dock::{DockPosition, Panel, PanelEvent},
-    notifications::DetachAndPromptErr,
     Workspace,
 };
 
@@ -280,22 +278,14 @@ impl ProjectPanel {
                                     focus_opened_item,
                                     cx,
                                 )
-                                .detach_and_prompt_err("Failed to open file", cx, move |e, _| {
-                                    match e.error_code() {
-                                        ErrorCode::UnsharedItem => Some(format!(
-                                            "{} is not shared by the host. This could be because it has been marked as `private`",
-                                            file_path.display()
-                                        )),
-                                        _ => None,
-                                    }
-                                });
+                                .detach();
 
                             if let Some(project_panel) = project_panel.upgrade() {
                                 // Always select the entry, regardless of whether it is opened or not.
                                 project_panel.update(cx, |project_panel, _| {
                                     project_panel.selection = Some(Selection {
                                         worktree_id,
-                                        entry_id
+                                        entry_id,
                                     });
                                 });
                                 if !focus_opened_item {
@@ -1415,7 +1405,7 @@ impl ProjectPanel {
         let icon = details.icon.clone();
         let depth = details.depth;
         div()
-            .id(entry_id.to_proto() as usize)
+            .id(entry_id.to_usize())
             .on_drag(entry_id, move |entry_id, cx| {
                 cx.new_view(|_| DraggedProjectEntryView {
                     details: details.clone(),
@@ -1430,7 +1420,7 @@ impl ProjectPanel {
                 this.move_entry(*dragged_id, entry_id, kind.is_file(), cx);
             }))
             .child(
-                ListItem::new(entry_id.to_proto() as usize)
+                ListItem::new(entry_id.to_usize())
                     .indent_level(depth)
                     .indent_step_size(px(settings.indent_size))
                     .selected(is_selected)
@@ -1620,7 +1610,7 @@ impl Render for DraggedProjectEntryView {
             .bg(cx.theme().colors().background)
             .w(self.width)
             .child(
-                ListItem::new(self.entry_id.to_proto() as usize)
+                ListItem::new(self.entry_id.to_usize())
                     .indent_level(self.details.depth)
                     .indent_step_size(px(settings.indent_size))
                     .child(if let Some(icon) = &self.details.icon {

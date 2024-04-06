@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use gpui::AppContext;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
@@ -6,10 +5,7 @@ use lsp::LanguageServerBinary;
 use project::project_settings::ProjectSettings;
 use serde_json::Value;
 use settings::Settings;
-use std::{
-    any::Any,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 pub struct DartLanguageServer;
 
@@ -19,6 +15,8 @@ impl LspAdapter for DartLanguageServer {
         LanguageServerName("dart".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -34,6 +32,7 @@ impl LspAdapter for DartLanguageServer {
     ) -> Result<LanguageServerBinary> {
         Err(anyhow!("dart must me installed from dart.dev/get-dart"))
     }
+    */
 
     async fn cached_server_binary(
         &self,

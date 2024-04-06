@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::StreamExt;
 use gpui::{AppContext, AsyncAppContext, Task};
@@ -9,10 +9,8 @@ use schemars::JsonSchema;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use settings::Settings;
-use smol::fs::{self, File};
+use smol::fs;
 use std::{
-    any::Any,
-    env::consts,
     ops::Deref,
     path::{Path, PathBuf},
     sync::{
@@ -21,11 +19,7 @@ use std::{
     },
 };
 use task::static_source::{Definition, TaskDefinitions};
-use util::{
-    fs::remove_matching,
-    github::{latest_github_release, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use util::{maybe, ResultExt};
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ElixirSettings {
@@ -104,6 +98,8 @@ impl LspAdapter for ElixirLspAdapter {
         }))
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -176,6 +172,7 @@ impl LspAdapter for ElixirLspAdapter {
             arguments: vec![],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,
@@ -312,6 +309,8 @@ impl LspAdapter for NextLspAdapter {
         LanguageServerName("next-ls".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -381,6 +380,7 @@ impl LspAdapter for NextLspAdapter {
             arguments: vec!["--stdio".into()],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,
@@ -466,6 +466,8 @@ impl LspAdapter for LocalLspAdapter {
         LanguageServerName("local-ls".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -486,6 +488,7 @@ impl LspAdapter for LocalLspAdapter {
             arguments: self.arguments.iter().map(|arg| arg.into()).collect(),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

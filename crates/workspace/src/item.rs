@@ -661,7 +661,7 @@ pub mod test {
 
     impl TestProjectItem {
         pub fn new(id: u64, path: &str, cx: &mut AppContext) -> Model<Self> {
-            let entry_id = Some(ProjectEntryId::from_proto(id));
+            let entry_id = Some(ProjectEntryId::from_u64(id));
             let project_path = Some(ProjectPath {
                 worktree_id: WorktreeId::from_usize(0),
                 path: Path::new(path).into(),

@@ -2,7 +2,7 @@ pub use crate::{
     diagnostic_set::DiagnosticSet,
     highlight_map::{HighlightId, HighlightMap},
     markdown::ParsedMarkdown,
-    proto, Grammar, Language, LanguageRegistry,
+    Grammar, Language, LanguageRegistry,
 };
 use crate::{
     diagnostic_set::{DiagnosticEntry, DiagnosticGroup},
@@ -15,7 +15,7 @@ use crate::{
     },
     CodeLabel, LanguageScope, Outline,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 pub use clock::ReplicaId;
 use futures::channel::oneshot;
 use gpui::{AppContext, EventEmitter, HighlightStyle, ModelContext, Task, TaskLabel};
@@ -387,9 +387,6 @@ pub trait File: Send + Sync {
     /// Converts this file into an [`Any`] trait object.
     fn as_any(&self) -> &dyn Any;
 
-    /// Converts this file into a protobuf message.
-    fn to_proto(&self) -> rpc::proto::File;
-
     /// Return whether Zed considers this to be a private file.
     fn is_private(&self) -> bool;
 }
@@ -553,93 +550,6 @@ impl Buffer {
             None,
             capability,
         )
-    }
-
-    /// Create a new buffer that is a replica of a remote buffer, populating its
-    /// state from the given protobuf message.
-    pub fn from_proto(
-        replica_id: ReplicaId,
-        capability: Capability,
-        message: proto::BufferState,
-        file: Option<Arc<dyn File>>,
-    ) -> Result<Self> {
-        let buffer_id = BufferId::new(message.id)
-            .with_context(|| anyhow!("Could not deserialize buffer_id"))?;
-        let buffer = TextBuffer::new(replica_id, buffer_id, message.base_text);
-        let mut this = Self::build(
-            buffer,
-            message.diff_base.map(|text| text.into_boxed_str().into()),
-            file,
-            capability,
-        );
-        this.text.set_line_ending(proto::deserialize_line_ending(
-            rpc::proto::LineEnding::from_i32(message.line_ending)
-                .ok_or_else(|| anyhow!("missing line_ending"))?,
-        ));
-        this.saved_version = proto::deserialize_version(&message.saved_version);
-        this.saved_mtime = message.saved_mtime.map(|time| time.into());
-        Ok(this)
-    }
-
-    /// Serialize the buffer's state to a protobuf message.
-    pub fn to_proto(&self) -> proto::BufferState {
-        proto::BufferState {
-            id: self.remote_id().into(),
-            file: self.file.as_ref().map(|f| f.to_proto()),
-            base_text: self.base_text().to_string(),
-            diff_base: self.diff_base.as_ref().map(|h| h.to_string()),
-            line_ending: proto::serialize_line_ending(self.line_ending()) as i32,
-            saved_version: proto::serialize_version(&self.saved_version),
-            saved_version_fingerprint: proto::serialize_fingerprint(self.file_fingerprint),
-            saved_mtime: self.saved_mtime.map(|time| time.into()),
-        }
-    }
-
-    /// Serialize as protobufs all of the changes to the buffer since the given version.
-    pub fn serialize_ops(
-        &self,
-        since: Option<clock::Global>,
-        cx: &AppContext,
-    ) -> Task<Vec<proto::Operation>> {
-        let mut operations = Vec::new();
-        operations.extend(self.deferred_ops.iter().map(proto::serialize_operation));
-
-        operations.extend(self.remote_selections.iter().map(|(_, set)| {
-            proto::serialize_operation(&Operation::UpdateSelections {
-                selections: set.selections.clone(),
-                lamport_timestamp: set.lamport_timestamp,
-                line_mode: set.line_mode,
-                cursor_shape: set.cursor_shape,
-            })
-        }));
-
-        for (server_id, diagnostics) in &self.diagnostics {
-            operations.push(proto::serialize_operation(&Operation::UpdateDiagnostics {
-                lamport_timestamp: self.diagnostics_timestamp,
-                server_id: *server_id,
-                diagnostics: diagnostics.iter().cloned().collect(),
-            }));
-        }
-
-        operations.push(proto::serialize_operation(
-            &Operation::UpdateCompletionTriggers {
-                triggers: self.completion_triggers.clone(),
-                lamport_timestamp: self.completion_triggers_timestamp,
-            },
-        ));
-
-        let text_operations = self.text.operations().clone();
-        cx.background_executor().spawn(async move {
-            let since = since.unwrap_or_default();
-            operations.extend(
-                text_operations
-                    .iter()
-                    .filter(|(_, op)| !since.observed(op.timestamp()))
-                    .map(|(_, op)| proto::serialize_operation(&Operation::Buffer(op.clone()))),
-            );
-            operations.sort_unstable_by_key(proto::lamport_timestamp_for_operation);
-            operations
-        })
     }
 
     /// Assign a language to the buffer, returning the buffer.
@@ -3563,10 +3473,6 @@ impl File for TestFile {
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
-        unimplemented!()
-    }
-
-    fn to_proto(&self) -> rpc::proto::File {
         unimplemented!()
     }
 

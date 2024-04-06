@@ -5,23 +5,20 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use client::proto::{self, PeerId};
 use futures::future;
 use gpui::{AppContext, AsyncAppContext, Model};
 use language::{
-    language_settings::{language_settings, InlayHintKind},
-    point_from_lsp, point_to_lsp, prepare_completion_documentation,
-    proto::{deserialize_anchor, deserialize_version, serialize_anchor, serialize_version},
-    range_from_lsp, range_to_lsp, Anchor, Bias, Buffer, BufferSnapshot, CachedLspAdapter, CharKind,
-    CodeAction, Completion, OffsetRangeExt, PointUtf16, ToOffset, ToPointUtf16, Transaction,
-    Unclipped,
+    language_settings::InlayHintKind, point_from_lsp, point_to_lsp,
+    prepare_completion_documentation, range_from_lsp, range_to_lsp, Anchor, Bias, Buffer,
+    BufferSnapshot, CachedLspAdapter, CharKind, CodeAction, Completion, OffsetRangeExt, PointUtf16,
+    ToOffset, ToPointUtf16, Transaction, Unclipped,
 };
 use lsp::{
-    CompletionListItemDefaultsEditRange, DocumentHighlightKind, LanguageServer, LanguageServerId,
-    OneOf, ServerCapabilities,
+    CompletionListItemDefaultsEditRange, LanguageServer, LanguageServerId, OneOf,
+    ServerCapabilities,
 };
 use std::{cmp::Reverse, ops::Range, path::Path, sync::Arc};
-use text::{BufferId, LineEnding};
+use text::LineEnding;
 
 pub fn lsp_formatting_options(tab_size: u32) -> lsp::FormattingOptions {
     lsp::FormattingOptions {
@@ -36,7 +33,6 @@ pub fn lsp_formatting_options(tab_size: u32) -> lsp::FormattingOptions {
 pub trait LspCommand: 'static + Sized + Send {
     type Response: 'static + Default + Send;
     type LspRequest: 'static + Send + lsp::request::Request;
-    type ProtoRequest: 'static + Send + proto::RequestMessage;
 
     fn check_capabilities(&self, _: &lsp::ServerCapabilities) -> bool {
         true
@@ -58,33 +54,6 @@ pub trait LspCommand: 'static + Sized + Send {
         server_id: LanguageServerId,
         cx: AsyncAppContext,
     ) -> Result<Self::Response>;
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> Self::ProtoRequest;
-
-    async fn from_proto(
-        message: Self::ProtoRequest,
-        project: Model<Project>,
-        buffer: Model<Buffer>,
-        cx: AsyncAppContext,
-    ) -> Result<Self>;
-
-    fn response_to_proto(
-        response: Self::Response,
-        project: &mut Project,
-        peer_id: PeerId,
-        buffer_version: &clock::Global,
-        cx: &mut AppContext,
-    ) -> <Self::ProtoRequest as proto::RequestMessage>::Response;
-
-    async fn response_from_proto(
-        self,
-        message: <Self::ProtoRequest as proto::RequestMessage>::Response,
-        project: Model<Project>,
-        buffer: Model<Buffer>,
-        cx: AsyncAppContext,
-    ) -> Result<Self::Response>;
-
-    fn buffer_id_from_proto(message: &Self::ProtoRequest) -> Result<BufferId>;
 }
 
 pub(crate) struct PrepareRename {
@@ -157,7 +126,6 @@ impl From<lsp::FormattingOptions> for FormattingOptions {
 impl LspCommand for PrepareRename {
     type Response = Option<Range<Anchor>>;
     type LspRequest = lsp::request::PrepareRenameRequest;
-    type ProtoRequest = proto::PrepareRename;
 
     fn check_capabilities(&self, capabilities: &ServerCapabilities) -> bool {
         if let Some(lsp::OneOf::Right(rename)) = &capabilities.rename_provider {
@@ -206,89 +174,12 @@ impl LspCommand for PrepareRename {
             Ok(None)
         })?
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::PrepareRename {
-        proto::PrepareRename {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::PrepareRename,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        range: Option<Range<Anchor>>,
-        _: &mut Project,
-        _: PeerId,
-        buffer_version: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::PrepareRenameResponse {
-        proto::PrepareRenameResponse {
-            can_rename: range.is_some(),
-            start: range
-                .as_ref()
-                .map(|range| language::proto::serialize_anchor(&range.start)),
-            end: range
-                .as_ref()
-                .map(|range| language::proto::serialize_anchor(&range.end)),
-            version: serialize_version(buffer_version),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::PrepareRenameResponse,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Option<Range<Anchor>>> {
-        if message.can_rename {
-            buffer
-                .update(&mut cx, |buffer, _| {
-                    buffer.wait_for_version(deserialize_version(&message.version))
-                })?
-                .await?;
-            let start = message.start.and_then(deserialize_anchor);
-            let end = message.end.and_then(deserialize_anchor);
-            Ok(start.zip(end).map(|(start, end)| start..end))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn buffer_id_from_proto(message: &proto::PrepareRename) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for PerformRename {
     type Response = ProjectTransaction;
     type LspRequest = lsp::request::Rename;
-    type ProtoRequest = proto::PerformRename;
 
     fn to_lsp(
         &self,
@@ -333,81 +224,12 @@ impl LspCommand for PerformRename {
             Ok(ProjectTransaction::default())
         }
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::PerformRename {
-        proto::PerformRename {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            new_name: self.new_name.clone(),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::PerformRename,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-            new_name: message.new_name,
-            push_to_history: false,
-        })
-    }
-
-    fn response_to_proto(
-        response: ProjectTransaction,
-        project: &mut Project,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut AppContext,
-    ) -> proto::PerformRenameResponse {
-        let transaction = project.serialize_project_transaction_for_peer(response, peer_id, cx);
-        proto::PerformRenameResponse {
-            transaction: Some(transaction),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::PerformRenameResponse,
-        project: Model<Project>,
-        _: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<ProjectTransaction> {
-        let message = message
-            .transaction
-            .ok_or_else(|| anyhow!("missing transaction"))?;
-        project
-            .update(&mut cx, |project, cx| {
-                project.deserialize_project_transaction(message, self.push_to_history, cx)
-            })?
-            .await
-    }
-
-    fn buffer_id_from_proto(message: &proto::PerformRename) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetDefinition {
     type Response = Vec<LocationLink>;
     type LspRequest = lsp::request::GotoDefinition;
-    type ProtoRequest = proto::GetDefinition;
 
     fn to_lsp(
         &self,
@@ -438,69 +260,12 @@ impl LspCommand for GetDefinition {
     ) -> Result<Vec<LocationLink>> {
         location_links_from_lsp(message, project, buffer, server_id, cx).await
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetDefinition {
-        proto::GetDefinition {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetDefinition,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<LocationLink>,
-        project: &mut Project,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut AppContext,
-    ) -> proto::GetDefinitionResponse {
-        let links = location_links_to_proto(response, project, peer_id, cx);
-        proto::GetDefinitionResponse { links }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetDefinitionResponse,
-        project: Model<Project>,
-        _: Model<Buffer>,
-        cx: AsyncAppContext,
-    ) -> Result<Vec<LocationLink>> {
-        location_links_from_proto(message.links, project, cx).await
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetDefinition) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetImplementation {
     type Response = Vec<LocationLink>;
     type LspRequest = lsp::request::GotoImplementation;
-    type ProtoRequest = proto::GetImplementation;
 
     fn to_lsp(
         &self,
@@ -531,69 +296,12 @@ impl LspCommand for GetImplementation {
     ) -> Result<Vec<LocationLink>> {
         location_links_from_lsp(message, project, buffer, server_id, cx).await
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetImplementation {
-        proto::GetImplementation {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetImplementation,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<LocationLink>,
-        project: &mut Project,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut AppContext,
-    ) -> proto::GetImplementationResponse {
-        let links = location_links_to_proto(response, project, peer_id, cx);
-        proto::GetImplementationResponse { links }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetImplementationResponse,
-        project: Model<Project>,
-        _: Model<Buffer>,
-        cx: AsyncAppContext,
-    ) -> Result<Vec<LocationLink>> {
-        location_links_from_proto(message.links, project, cx).await
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetImplementation) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetTypeDefinition {
     type Response = Vec<LocationLink>;
     type LspRequest = lsp::request::GotoTypeDefinition;
-    type ProtoRequest = proto::GetTypeDefinition;
 
     fn check_capabilities(&self, capabilities: &ServerCapabilities) -> bool {
         match &capabilities.type_definition_provider {
@@ -632,62 +340,6 @@ impl LspCommand for GetTypeDefinition {
     ) -> Result<Vec<LocationLink>> {
         location_links_from_lsp(message, project, buffer, server_id, cx).await
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetTypeDefinition {
-        proto::GetTypeDefinition {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetTypeDefinition,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<LocationLink>,
-        project: &mut Project,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut AppContext,
-    ) -> proto::GetTypeDefinitionResponse {
-        let links = location_links_to_proto(response, project, peer_id, cx);
-        proto::GetTypeDefinitionResponse { links }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetTypeDefinitionResponse,
-        project: Model<Project>,
-        _: Model<Buffer>,
-        cx: AsyncAppContext,
-    ) -> Result<Vec<LocationLink>> {
-        location_links_from_proto(message.links, project, cx).await
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetTypeDefinition) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 fn language_server_for_buffer(
@@ -703,70 +355,6 @@ fn language_server_for_buffer(
                 .map(|(adapter, server)| (adapter.clone(), server.clone()))
         })?
         .ok_or_else(|| anyhow!("no language server found for buffer"))
-}
-
-async fn location_links_from_proto(
-    proto_links: Vec<proto::LocationLink>,
-    project: Model<Project>,
-    mut cx: AsyncAppContext,
-) -> Result<Vec<LocationLink>> {
-    let mut links = Vec::new();
-
-    for link in proto_links {
-        let origin = match link.origin {
-            Some(origin) => {
-                let buffer_id = BufferId::new(origin.buffer_id)?;
-                let buffer = project
-                    .update(&mut cx, |this, cx| {
-                        this.wait_for_remote_buffer(buffer_id, cx)
-                    })?
-                    .await?;
-                let start = origin
-                    .start
-                    .and_then(deserialize_anchor)
-                    .ok_or_else(|| anyhow!("missing origin start"))?;
-                let end = origin
-                    .end
-                    .and_then(deserialize_anchor)
-                    .ok_or_else(|| anyhow!("missing origin end"))?;
-                buffer
-                    .update(&mut cx, |buffer, _| buffer.wait_for_anchors([start, end]))?
-                    .await?;
-                Some(Location {
-                    buffer,
-                    range: start..end,
-                })
-            }
-            None => None,
-        };
-
-        let target = link.target.ok_or_else(|| anyhow!("missing target"))?;
-        let buffer_id = BufferId::new(target.buffer_id)?;
-        let buffer = project
-            .update(&mut cx, |this, cx| {
-                this.wait_for_remote_buffer(buffer_id, cx)
-            })?
-            .await?;
-        let start = target
-            .start
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("missing target start"))?;
-        let end = target
-            .end
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("missing target end"))?;
-        buffer
-            .update(&mut cx, |buffer, _| buffer.wait_for_anchors([start, end]))?
-            .await?;
-        let target = Location {
-            buffer,
-            range: start..end,
-        };
-
-        links.push(LocationLink { origin, target })
-    }
-
-    Ok(links)
 }
 
 async fn location_links_from_lsp(
@@ -851,48 +439,10 @@ async fn location_links_from_lsp(
     Ok(definitions)
 }
 
-fn location_links_to_proto(
-    links: Vec<LocationLink>,
-    project: &mut Project,
-    peer_id: PeerId,
-    cx: &mut AppContext,
-) -> Vec<proto::LocationLink> {
-    links
-        .into_iter()
-        .map(|definition| {
-            let origin = definition.origin.map(|origin| {
-                let buffer_id = project
-                    .create_buffer_for_peer(&origin.buffer, peer_id, cx)
-                    .into();
-                proto::Location {
-                    start: Some(serialize_anchor(&origin.range.start)),
-                    end: Some(serialize_anchor(&origin.range.end)),
-                    buffer_id,
-                }
-            });
-
-            let buffer_id = project
-                .create_buffer_for_peer(&definition.target.buffer, peer_id, cx)
-                .into();
-            let target = proto::Location {
-                start: Some(serialize_anchor(&definition.target.range.start)),
-                end: Some(serialize_anchor(&definition.target.range.end)),
-                buffer_id,
-            };
-
-            proto::LocationLink {
-                origin,
-                target: Some(target),
-            }
-        })
-        .collect()
-}
-
 #[async_trait(?Send)]
 impl LspCommand for GetReferences {
     type Response = Vec<Location>;
     type LspRequest = lsp::request::References;
-    type ProtoRequest = proto::GetReferences;
 
     fn to_lsp(
         &self,
@@ -959,103 +509,12 @@ impl LspCommand for GetReferences {
 
         Ok(references)
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetReferences {
-        proto::GetReferences {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetReferences,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<Location>,
-        project: &mut Project,
-        peer_id: PeerId,
-        _: &clock::Global,
-        cx: &mut AppContext,
-    ) -> proto::GetReferencesResponse {
-        let locations = response
-            .into_iter()
-            .map(|definition| {
-                let buffer_id = project.create_buffer_for_peer(&definition.buffer, peer_id, cx);
-                proto::Location {
-                    start: Some(serialize_anchor(&definition.range.start)),
-                    end: Some(serialize_anchor(&definition.range.end)),
-                    buffer_id: buffer_id.into(),
-                }
-            })
-            .collect();
-        proto::GetReferencesResponse { locations }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetReferencesResponse,
-        project: Model<Project>,
-        _: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Vec<Location>> {
-        let mut locations = Vec::new();
-        for location in message.locations {
-            let buffer_id = BufferId::new(location.buffer_id)?;
-            let target_buffer = project
-                .update(&mut cx, |this, cx| {
-                    this.wait_for_remote_buffer(buffer_id, cx)
-                })?
-                .await?;
-            let start = location
-                .start
-                .and_then(deserialize_anchor)
-                .ok_or_else(|| anyhow!("missing target start"))?;
-            let end = location
-                .end
-                .and_then(deserialize_anchor)
-                .ok_or_else(|| anyhow!("missing target end"))?;
-            target_buffer
-                .update(&mut cx, |buffer, _| buffer.wait_for_anchors([start, end]))?
-                .await?;
-            locations.push(Location {
-                buffer: target_buffer,
-                range: start..end,
-            })
-        }
-        Ok(locations)
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetReferences) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetDocumentHighlights {
     type Response = Vec<DocumentHighlight>;
     type LspRequest = lsp::request::DocumentHighlightRequest;
-    type ProtoRequest = proto::GetDocumentHighlights;
 
     fn check_capabilities(&self, capabilities: &ServerCapabilities) -> bool {
         capabilities.document_highlight_provider.is_some()
@@ -1108,105 +567,12 @@ impl LspCommand for GetDocumentHighlights {
                 .collect()
         })
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetDocumentHighlights {
-        proto::GetDocumentHighlights {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetDocumentHighlights,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Vec<DocumentHighlight>,
-        _: &mut Project,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::GetDocumentHighlightsResponse {
-        let highlights = response
-            .into_iter()
-            .map(|highlight| proto::DocumentHighlight {
-                start: Some(serialize_anchor(&highlight.range.start)),
-                end: Some(serialize_anchor(&highlight.range.end)),
-                kind: match highlight.kind {
-                    DocumentHighlightKind::TEXT => proto::document_highlight::Kind::Text.into(),
-                    DocumentHighlightKind::WRITE => proto::document_highlight::Kind::Write.into(),
-                    DocumentHighlightKind::READ => proto::document_highlight::Kind::Read.into(),
-                    _ => proto::document_highlight::Kind::Text.into(),
-                },
-            })
-            .collect();
-        proto::GetDocumentHighlightsResponse { highlights }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetDocumentHighlightsResponse,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Vec<DocumentHighlight>> {
-        let mut highlights = Vec::new();
-        for highlight in message.highlights {
-            let start = highlight
-                .start
-                .and_then(deserialize_anchor)
-                .ok_or_else(|| anyhow!("missing target start"))?;
-            let end = highlight
-                .end
-                .and_then(deserialize_anchor)
-                .ok_or_else(|| anyhow!("missing target end"))?;
-            buffer
-                .update(&mut cx, |buffer, _| buffer.wait_for_anchors([start, end]))?
-                .await?;
-            let kind = match proto::document_highlight::Kind::from_i32(highlight.kind) {
-                Some(proto::document_highlight::Kind::Text) => DocumentHighlightKind::TEXT,
-                Some(proto::document_highlight::Kind::Read) => DocumentHighlightKind::READ,
-                Some(proto::document_highlight::Kind::Write) => DocumentHighlightKind::WRITE,
-                None => DocumentHighlightKind::TEXT,
-            };
-            highlights.push(DocumentHighlight {
-                range: start..end,
-                kind,
-            });
-        }
-        Ok(highlights)
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetDocumentHighlights) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetHover {
     type Response = Option<Hover>;
     type LspRequest = lsp::request::HoverRequest;
-    type ProtoRequest = proto::GetHover;
 
     fn to_lsp(
         &self,
@@ -1296,140 +662,12 @@ impl LspCommand for GetHover {
             language,
         }))
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> Self::ProtoRequest {
-        proto::GetHover {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            version: serialize_version(&buffer.version),
-        }
-    }
-
-    async fn from_proto(
-        message: Self::ProtoRequest,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-        })
-    }
-
-    fn response_to_proto(
-        response: Self::Response,
-        _: &mut Project,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::GetHoverResponse {
-        if let Some(response) = response {
-            let (start, end) = if let Some(range) = response.range {
-                (
-                    Some(language::proto::serialize_anchor(&range.start)),
-                    Some(language::proto::serialize_anchor(&range.end)),
-                )
-            } else {
-                (None, None)
-            };
-
-            let contents = response
-                .contents
-                .into_iter()
-                .map(|block| proto::HoverBlock {
-                    text: block.text,
-                    is_markdown: block.kind == HoverBlockKind::Markdown,
-                    language: if let HoverBlockKind::Code { language } = block.kind {
-                        Some(language)
-                    } else {
-                        None
-                    },
-                })
-                .collect();
-
-            proto::GetHoverResponse {
-                start,
-                end,
-                contents,
-            }
-        } else {
-            proto::GetHoverResponse {
-                start: None,
-                end: None,
-                contents: Vec::new(),
-            }
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetHoverResponse,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self::Response> {
-        let contents: Vec<_> = message
-            .contents
-            .into_iter()
-            .map(|block| HoverBlock {
-                text: block.text,
-                kind: if let Some(language) = block.language {
-                    HoverBlockKind::Code { language }
-                } else if block.is_markdown {
-                    HoverBlockKind::Markdown
-                } else {
-                    HoverBlockKind::PlainText
-                },
-            })
-            .collect();
-        if contents.is_empty() {
-            return Ok(None);
-        }
-
-        let language = buffer.update(&mut cx, |buffer, _| buffer.language().cloned())?;
-        let range = if let (Some(start), Some(end)) = (message.start, message.end) {
-            language::proto::deserialize_anchor(start)
-                .and_then(|start| language::proto::deserialize_anchor(end).map(|end| start..end))
-        } else {
-            None
-        };
-        if let Some(range) = range.as_ref() {
-            buffer
-                .update(&mut cx, |buffer, _| {
-                    buffer.wait_for_anchors([range.start, range.end])
-                })?
-                .await?;
-        }
-
-        Ok(Some(Hover {
-            contents,
-            range,
-            language,
-        }))
-    }
-
-    fn buffer_id_from_proto(message: &Self::ProtoRequest) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetCompletions {
     type Response = Vec<Completion>;
     type LspRequest = lsp::request::Completion;
-    type ProtoRequest = proto::GetCompletions;
 
     fn to_lsp(
         &self,
@@ -1620,90 +858,12 @@ impl LspCommand for GetCompletions {
 
         Ok(future::join_all(completions).await)
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetCompletions {
-        let anchor = buffer.anchor_after(self.position);
-        proto::GetCompletions {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(&anchor)),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetCompletions,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let version = deserialize_version(&message.version);
-        buffer
-            .update(&mut cx, |buffer, _| buffer.wait_for_version(version))?
-            .await?;
-        let position = message
-            .position
-            .and_then(language::proto::deserialize_anchor)
-            .map(|p| {
-                buffer.update(&mut cx, |buffer, _| {
-                    buffer.clip_point_utf16(Unclipped(p.to_point_utf16(buffer)), Bias::Left)
-                })
-            })
-            .ok_or_else(|| anyhow!("invalid position"))??;
-        Ok(Self { position })
-    }
-
-    fn response_to_proto(
-        completions: Vec<Completion>,
-        _: &mut Project,
-        _: PeerId,
-        buffer_version: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::GetCompletionsResponse {
-        proto::GetCompletionsResponse {
-            completions: completions
-                .iter()
-                .map(language::proto::serialize_completion)
-                .collect(),
-            version: serialize_version(buffer_version),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetCompletionsResponse,
-        project: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Vec<Completion>> {
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        let language = buffer.update(&mut cx, |buffer, _| buffer.language().cloned())?;
-        let language_registry = project.update(&mut cx, |project, _| project.languages.clone())?;
-        let completions = message.completions.into_iter().map(|completion| {
-            language::proto::deserialize_completion(
-                completion,
-                language.clone(),
-                &language_registry,
-            )
-        });
-        future::try_join_all(completions).await
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetCompletions) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 #[async_trait(?Send)]
 impl LspCommand for GetCodeActions {
     type Response = Vec<CodeAction>;
     type LspRequest = lsp::request::CodeActionRequest;
-    type ProtoRequest = proto::GetCodeActions;
 
     fn check_capabilities(&self, capabilities: &ServerCapabilities) -> bool {
         match &capabilities.code_action_provider {
@@ -1767,81 +927,6 @@ impl LspCommand for GetCodeActions {
             })
             .collect())
     }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetCodeActions {
-        proto::GetCodeActions {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            start: Some(language::proto::serialize_anchor(&self.range.start)),
-            end: Some(language::proto::serialize_anchor(&self.range.end)),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::GetCodeActions,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let start = message
-            .start
-            .and_then(language::proto::deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid start"))?;
-        let end = message
-            .end
-            .and_then(language::proto::deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid end"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        Ok(Self {
-            range: start..end,
-            kinds: None,
-        })
-    }
-
-    fn response_to_proto(
-        code_actions: Vec<CodeAction>,
-        _: &mut Project,
-        _: PeerId,
-        buffer_version: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::GetCodeActionsResponse {
-        proto::GetCodeActionsResponse {
-            actions: code_actions
-                .iter()
-                .map(language::proto::serialize_code_action)
-                .collect(),
-            version: serialize_version(buffer_version),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::GetCodeActionsResponse,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Vec<CodeAction>> {
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-        message
-            .actions
-            .into_iter()
-            .map(language::proto::deserialize_code_action)
-            .collect()
-    }
-
-    fn buffer_id_from_proto(message: &proto::GetCodeActions) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
-    }
 }
 
 impl GetCodeActions {
@@ -1861,7 +946,6 @@ impl GetCodeActions {
 impl LspCommand for OnTypeFormatting {
     type Response = Option<Transaction>;
     type LspRequest = lsp::request::OnTypeFormatting;
-    type ProtoRequest = proto::OnTypeFormatting;
 
     fn check_capabilities(&self, server_capabilities: &lsp::ServerCapabilities) -> bool {
         let Some(on_type_formatting_options) =
@@ -1920,76 +1004,6 @@ impl LspCommand for OnTypeFormatting {
         } else {
             Ok(None)
         }
-    }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::OnTypeFormatting {
-        proto::OnTypeFormatting {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            position: Some(language::proto::serialize_anchor(
-                &buffer.anchor_before(self.position),
-            )),
-            trigger: self.trigger.clone(),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::OnTypeFormatting,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let position = message
-            .position
-            .and_then(deserialize_anchor)
-            .ok_or_else(|| anyhow!("invalid position"))?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        let tab_size = buffer.update(&mut cx, |buffer, cx| {
-            language_settings(buffer.language(), buffer.file(), cx).tab_size
-        })?;
-
-        Ok(Self {
-            position: buffer.update(&mut cx, |buffer, _| position.to_point_utf16(buffer))?,
-            trigger: message.trigger.clone(),
-            options: lsp_formatting_options(tab_size.get()).into(),
-            push_to_history: false,
-        })
-    }
-
-    fn response_to_proto(
-        response: Option<Transaction>,
-        _: &mut Project,
-        _: PeerId,
-        _: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::OnTypeFormattingResponse {
-        proto::OnTypeFormattingResponse {
-            transaction: response
-                .map(|transaction| language::proto::serialize_transaction(&transaction)),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::OnTypeFormattingResponse,
-        _: Model<Project>,
-        _: Model<Buffer>,
-        _: AsyncAppContext,
-    ) -> Result<Option<Transaction>> {
-        let Some(transaction) = message.transaction else {
-            return Ok(None);
-        };
-        Ok(Some(language::proto::deserialize_transaction(transaction)?))
-    }
-
-    fn buffer_id_from_proto(message: &proto::OnTypeFormatting) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
     }
 }
 
@@ -2082,202 +1096,6 @@ impl InlayHints {
         Ok(label)
     }
 
-    pub fn project_to_proto_hint(response_hint: InlayHint) -> proto::InlayHint {
-        let (state, lsp_resolve_state) = match response_hint.resolve_state {
-            ResolveState::Resolved => (0, None),
-            ResolveState::CanResolve(server_id, resolve_data) => (
-                1,
-                resolve_data
-                    .map(|json_data| {
-                        serde_json::to_string(&json_data)
-                            .expect("failed to serialize resolve json data")
-                    })
-                    .map(|value| proto::resolve_state::LspResolveState {
-                        server_id: server_id.0 as u64,
-                        value,
-                    }),
-            ),
-            ResolveState::Resolving => (2, None),
-        };
-        let resolve_state = Some(proto::ResolveState {
-            state,
-            lsp_resolve_state,
-        });
-        proto::InlayHint {
-            position: Some(language::proto::serialize_anchor(&response_hint.position)),
-            padding_left: response_hint.padding_left,
-            padding_right: response_hint.padding_right,
-            label: Some(proto::InlayHintLabel {
-                label: Some(match response_hint.label {
-                    InlayHintLabel::String(s) => proto::inlay_hint_label::Label::Value(s),
-                    InlayHintLabel::LabelParts(label_parts) => {
-                        proto::inlay_hint_label::Label::LabelParts(proto::InlayHintLabelParts {
-                            parts: label_parts.into_iter().map(|label_part| {
-                                let location_url = label_part.location.as_ref().map(|(_, location)| location.uri.to_string());
-                                let location_range_start = label_part.location.as_ref().map(|(_, location)| point_from_lsp(location.range.start).0).map(|point| proto::PointUtf16 { row: point.row, column: point.column });
-                                let location_range_end = label_part.location.as_ref().map(|(_, location)| point_from_lsp(location.range.end).0).map(|point| proto::PointUtf16 { row: point.row, column: point.column });
-                                proto::InlayHintLabelPart {
-                                value: label_part.value,
-                                tooltip: label_part.tooltip.map(|tooltip| {
-                                    let proto_tooltip = match tooltip {
-                                        InlayHintLabelPartTooltip::String(s) => proto::inlay_hint_label_part_tooltip::Content::Value(s),
-                                        InlayHintLabelPartTooltip::MarkupContent(markup_content) => proto::inlay_hint_label_part_tooltip::Content::MarkupContent(proto::MarkupContent {
-                                            is_markdown: markup_content.kind == HoverBlockKind::Markdown,
-                                            value: markup_content.value,
-                                        }),
-                                    };
-                                    proto::InlayHintLabelPartTooltip {content: Some(proto_tooltip)}
-                                }),
-                                location_url,
-                                location_range_start,
-                                location_range_end,
-                                language_server_id: label_part.location.as_ref().map(|(server_id, _)| server_id.0 as u64),
-                            }}).collect()
-                        })
-                    }
-                }),
-            }),
-            kind: response_hint.kind.map(|kind| kind.name().to_string()),
-            tooltip: response_hint.tooltip.map(|response_tooltip| {
-                let proto_tooltip = match response_tooltip {
-                    InlayHintTooltip::String(s) => proto::inlay_hint_tooltip::Content::Value(s),
-                    InlayHintTooltip::MarkupContent(markup_content) => {
-                        proto::inlay_hint_tooltip::Content::MarkupContent(proto::MarkupContent {
-                            is_markdown: markup_content.kind == HoverBlockKind::Markdown,
-                            value: markup_content.value,
-                        })
-                    }
-                };
-                proto::InlayHintTooltip {
-                    content: Some(proto_tooltip),
-                }
-            }),
-            resolve_state,
-        }
-    }
-
-    pub fn proto_to_project_hint(message_hint: proto::InlayHint) -> anyhow::Result<InlayHint> {
-        let resolve_state = message_hint.resolve_state.as_ref().unwrap_or_else(|| {
-            panic!("incorrect proto inlay hint message: no resolve state in hint {message_hint:?}",)
-        });
-        let resolve_state_data = resolve_state
-            .lsp_resolve_state.as_ref()
-            .map(|lsp_resolve_state| {
-                serde_json::from_str::<Option<lsp::LSPAny>>(&lsp_resolve_state.value)
-                    .with_context(|| format!("incorrect proto inlay hint message: non-json resolve state {lsp_resolve_state:?}"))
-                    .map(|state| (LanguageServerId(lsp_resolve_state.server_id as usize), state))
-            })
-            .transpose()?;
-        let resolve_state = match resolve_state.state {
-            0 => ResolveState::Resolved,
-            1 => {
-                let (server_id, lsp_resolve_state) = resolve_state_data.with_context(|| {
-                    format!(
-                        "No lsp resolve data for the hint that can be resolved: {message_hint:?}"
-                    )
-                })?;
-                ResolveState::CanResolve(server_id, lsp_resolve_state)
-            }
-            2 => ResolveState::Resolving,
-            invalid => {
-                anyhow::bail!("Unexpected resolve state {invalid} for hint {message_hint:?}")
-            }
-        };
-        Ok(InlayHint {
-            position: message_hint
-                .position
-                .and_then(language::proto::deserialize_anchor)
-                .context("invalid position")?,
-            label: match message_hint
-                .label
-                .and_then(|label| label.label)
-                .context("missing label")?
-            {
-                proto::inlay_hint_label::Label::Value(s) => InlayHintLabel::String(s),
-                proto::inlay_hint_label::Label::LabelParts(parts) => {
-                    let mut label_parts = Vec::new();
-                    for part in parts.parts {
-                        label_parts.push(InlayHintLabelPart {
-                            value: part.value,
-                            tooltip: part.tooltip.map(|tooltip| match tooltip.content {
-                                Some(proto::inlay_hint_label_part_tooltip::Content::Value(s)) => {
-                                    InlayHintLabelPartTooltip::String(s)
-                                }
-                                Some(
-                                    proto::inlay_hint_label_part_tooltip::Content::MarkupContent(
-                                        markup_content,
-                                    ),
-                                ) => InlayHintLabelPartTooltip::MarkupContent(MarkupContent {
-                                    kind: if markup_content.is_markdown {
-                                        HoverBlockKind::Markdown
-                                    } else {
-                                        HoverBlockKind::PlainText
-                                    },
-                                    value: markup_content.value,
-                                }),
-                                None => InlayHintLabelPartTooltip::String(String::new()),
-                            }),
-                            location: {
-                                match part
-                                    .location_url
-                                    .zip(
-                                        part.location_range_start.and_then(|start| {
-                                            Some(start..part.location_range_end?)
-                                        }),
-                                    )
-                                    .zip(part.language_server_id)
-                                {
-                                    Some(((uri, range), server_id)) => Some((
-                                        LanguageServerId(server_id as usize),
-                                        lsp::Location {
-                                            uri: lsp::Url::parse(&uri)
-                                                .context("invalid uri in hint part {part:?}")?,
-                                            range: lsp::Range::new(
-                                                point_to_lsp(PointUtf16::new(
-                                                    range.start.row,
-                                                    range.start.column,
-                                                )),
-                                                point_to_lsp(PointUtf16::new(
-                                                    range.end.row,
-                                                    range.end.column,
-                                                )),
-                                            ),
-                                        },
-                                    )),
-                                    None => None,
-                                }
-                            },
-                        });
-                    }
-
-                    InlayHintLabel::LabelParts(label_parts)
-                }
-            },
-            padding_left: message_hint.padding_left,
-            padding_right: message_hint.padding_right,
-            kind: message_hint
-                .kind
-                .as_deref()
-                .and_then(InlayHintKind::from_name),
-            tooltip: message_hint.tooltip.and_then(|tooltip| {
-                Some(match tooltip.content? {
-                    proto::inlay_hint_tooltip::Content::Value(s) => InlayHintTooltip::String(s),
-                    proto::inlay_hint_tooltip::Content::MarkupContent(markup_content) => {
-                        InlayHintTooltip::MarkupContent(MarkupContent {
-                            kind: if markup_content.is_markdown {
-                                HoverBlockKind::Markdown
-                            } else {
-                                HoverBlockKind::PlainText
-                            },
-                            value: markup_content.value,
-                        })
-                    }
-                })
-            }),
-            resolve_state,
-        })
-    }
-
     pub fn project_to_lsp_hint(hint: InlayHint, snapshot: &BufferSnapshot) -> lsp::InlayHint {
         lsp::InlayHint {
             position: point_to_lsp(hint.position.to_point_utf16(snapshot)),
@@ -2367,7 +1185,6 @@ impl InlayHints {
 impl LspCommand for InlayHints {
     type Response = Vec<InlayHint>;
     type LspRequest = lsp::InlayHintRequest;
-    type ProtoRequest = proto::InlayHints;
 
     fn check_capabilities(&self, server_capabilities: &lsp::ServerCapabilities) -> bool {
         let Some(inlay_hint_provider) = &server_capabilities.inlay_hint_provider else {
@@ -2443,79 +1260,5 @@ impl LspCommand for InlayHints {
             .into_iter()
             .collect::<anyhow::Result<_>>()
             .context("lsp to project inlay hints conversion")
-    }
-
-    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::InlayHints {
-        proto::InlayHints {
-            project_id,
-            buffer_id: buffer.remote_id().into(),
-            start: Some(language::proto::serialize_anchor(&self.range.start)),
-            end: Some(language::proto::serialize_anchor(&self.range.end)),
-            version: serialize_version(&buffer.version()),
-        }
-    }
-
-    async fn from_proto(
-        message: proto::InlayHints,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> Result<Self> {
-        let start = message
-            .start
-            .and_then(language::proto::deserialize_anchor)
-            .context("invalid start")?;
-        let end = message
-            .end
-            .and_then(language::proto::deserialize_anchor)
-            .context("invalid end")?;
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        Ok(Self { range: start..end })
-    }
-
-    fn response_to_proto(
-        response: Vec<InlayHint>,
-        _: &mut Project,
-        _: PeerId,
-        buffer_version: &clock::Global,
-        _: &mut AppContext,
-    ) -> proto::InlayHintsResponse {
-        proto::InlayHintsResponse {
-            hints: response
-                .into_iter()
-                .map(|response_hint| InlayHints::project_to_proto_hint(response_hint))
-                .collect(),
-            version: serialize_version(buffer_version),
-        }
-    }
-
-    async fn response_from_proto(
-        self,
-        message: proto::InlayHintsResponse,
-        _: Model<Project>,
-        buffer: Model<Buffer>,
-        mut cx: AsyncAppContext,
-    ) -> anyhow::Result<Vec<InlayHint>> {
-        buffer
-            .update(&mut cx, |buffer, _| {
-                buffer.wait_for_version(deserialize_version(&message.version))
-            })?
-            .await?;
-
-        let mut hints = Vec::new();
-        for message_hint in message.hints {
-            hints.push(InlayHints::proto_to_project_hint(message_hint)?);
-        }
-
-        Ok(hints)
-    }
-
-    fn buffer_id_from_proto(message: &proto::InlayHints) -> Result<BufferId> {
-        BufferId::new(message.buffer_id)
     }
 }

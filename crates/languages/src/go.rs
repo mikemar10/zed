@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::StreamExt;
 use gpui::{AsyncAppContext, Task};
@@ -11,8 +11,7 @@ use serde_json::json;
 use settings::Settings;
 use smol::{fs, process};
 use std::{
-    any::Any,
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     ops::Range,
     path::PathBuf,
     str,
@@ -21,7 +20,7 @@ use std::{
         Arc,
     },
 };
-use util::{fs::remove_matching, github::latest_github_release, maybe, ResultExt};
+use util::{maybe, ResultExt};
 
 fn server_binary_arguments() -> Vec<OsString> {
     vec!["-mode=stdio".into()]
@@ -44,6 +43,8 @@ impl super::LspAdapter for GoLspAdapter {
         LanguageServerName(Self::SERVER_NAME.into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -59,6 +60,7 @@ impl super::LspAdapter for GoLspAdapter {
         }
         Ok(Box::new(version) as Box<_>)
     }
+    */
 
     async fn check_if_user_installed(
         &self,
@@ -125,6 +127,8 @@ impl super::LspAdapter for GoLspAdapter {
         }))
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_server_binary(
         &self,
         version: Box<dyn 'static + Send + Any>,
@@ -197,6 +201,7 @@ impl super::LspAdapter for GoLspAdapter {
             env: None,
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

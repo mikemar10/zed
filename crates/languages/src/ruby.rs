@@ -1,8 +1,7 @@
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
-use std::{any::Any, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 pub struct RubyLanguageServer;
 
@@ -12,6 +11,8 @@ impl LspAdapter for RubyLanguageServer {
         LanguageServerName("solargraph".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -27,6 +28,7 @@ impl LspAdapter for RubyLanguageServer {
     ) -> Result<LanguageServerBinary> {
         Err(anyhow!("solargraph must be installed manually"))
     }
+    */
 
     async fn cached_server_binary(
         &self,

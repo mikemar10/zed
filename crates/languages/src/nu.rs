@@ -1,8 +1,7 @@
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
-use std::{any::Any, path::PathBuf};
+use std::path::PathBuf;
 
 pub struct NuLanguageServer;
 
@@ -12,6 +11,8 @@ impl LspAdapter for NuLanguageServer {
         LanguageServerName("nu".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -29,6 +30,7 @@ impl LspAdapter for NuLanguageServer {
             "nu v0.87.0 or greater must be installed and available in your $PATH"
         ))
     }
+    */
 
     async fn cached_server_binary(
         &self,

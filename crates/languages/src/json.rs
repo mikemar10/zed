@@ -11,7 +11,6 @@ use serde_json::{json, Value};
 use settings::{KeymapFile, SettingsJsonSchemaParams, SettingsStore};
 use smol::fs;
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
@@ -89,6 +88,8 @@ impl LspAdapter for JsonLspAdapter {
         LanguageServerName("json-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -127,6 +128,7 @@ impl LspAdapter for JsonLspAdapter {
             arguments: server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

@@ -1,7 +1,5 @@
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
-use anyhow::{Context, Result};
-use client::proto;
-use itertools::Itertools;
+use anyhow::Result;
 use language::{char_kind, BufferSnapshot};
 use regex::{Captures, Regex, RegexBuilder};
 use smol::future::yield_now;
@@ -123,27 +121,6 @@ impl SearchQuery {
         })
     }
 
-    pub fn from_proto(message: proto::SearchProject) -> Result<Self> {
-        if message.regex {
-            Self::regex(
-                message.query,
-                message.whole_word,
-                message.case_sensitive,
-                message.include_ignored,
-                deserialize_path_matches(&message.files_to_include)?,
-                deserialize_path_matches(&message.files_to_exclude)?,
-            )
-        } else {
-            Self::text(
-                message.query,
-                message.whole_word,
-                message.case_sensitive,
-                message.include_ignored,
-                deserialize_path_matches(&message.files_to_include)?,
-                deserialize_path_matches(&message.files_to_exclude)?,
-            )
-        }
-    }
     pub fn with_replacement(mut self, new_replacement: String) -> Self {
         match self {
             Self::Text {
@@ -157,26 +134,6 @@ impl SearchQuery {
                 *replacement = Some(new_replacement);
                 self
             }
-        }
-    }
-    pub fn to_proto(&self, project_id: u64) -> proto::SearchProject {
-        proto::SearchProject {
-            project_id,
-            query: self.as_str().to_string(),
-            regex: self.is_regex(),
-            whole_word: self.whole_word(),
-            case_sensitive: self.case_sensitive(),
-            include_ignored: self.include_ignored(),
-            files_to_include: self
-                .files_to_include()
-                .iter()
-                .map(|matcher| matcher.to_string())
-                .join(","),
-            files_to_exclude: self
-                .files_to_exclude()
-                .iter()
-                .map(|matcher| matcher.to_string())
-                .join(","),
         }
     }
 
@@ -415,18 +372,6 @@ impl SearchQuery {
             Self::Regex { inner, .. } | Self::Text { inner, .. } => inner,
         }
     }
-}
-
-fn deserialize_path_matches(glob_set: &str) -> anyhow::Result<Vec<PathMatcher>> {
-    glob_set
-        .split(',')
-        .map(str::trim)
-        .filter(|glob_str| !glob_str.is_empty())
-        .map(|glob_str| {
-            PathMatcher::new(glob_str)
-                .with_context(|| format!("deserializing path match glob {glob_str}"))
-        })
-        .collect()
 }
 
 #[cfg(test)]

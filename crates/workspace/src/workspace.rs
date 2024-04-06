@@ -11,7 +11,6 @@ mod toolbar;
 mod workspace_settings;
 
 use anyhow::{anyhow, Context as _, Result};
-use client::Client;
 use collections::{hash_map, HashMap, HashSet};
 use derive_more::{Deref, DerefMut};
 use dock::{Dock, DockPosition, Panel, PanelButtons, PanelHandle};
@@ -347,7 +346,6 @@ pub fn register_deserializable_item<I: Item>(cx: &mut AppContext) {
 
 pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
-    pub client: Arc<Client>,
     pub workspace_store: Model<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut AppContext) -> WindowOptions,
@@ -387,15 +385,12 @@ impl AppState {
 
         let fs = fs::FakeFs::new(cx.background_executor().clone());
         let languages = Arc::new(LanguageRegistry::test(cx.background_executor().clone()));
-        let http_client = util::http::FakeHttpClient::with_404_response();
-        let client = Client::new(http_client.clone());
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
         theme::init(theme::LoadThemes::JustBase, cx);
         crate::init_settings(cx);
 
         Arc::new(Self {
-            client,
             fs,
             languages,
             workspace_store,
@@ -721,7 +716,6 @@ impl Workspace {
         )>,
     > {
         let project_handle = Project::local(
-            app_state.client.clone(),
             app_state.node_runtime.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
@@ -1032,10 +1026,6 @@ impl Workspace {
         )
     }
 
-    pub fn client(&self) -> &Arc<Client> {
-        &self.app_state.client
-    }
-
     pub fn set_titlebar_item(&mut self, item: AnyView, cx: &mut ViewContext<Self>) {
         self.titlebar_item = Some(item);
         cx.notify();
@@ -1078,19 +1068,6 @@ impl Workspace {
         cx: &'a AppContext,
     ) -> impl 'a + Iterator<Item = Model<Worktree>> {
         self.project.read(cx).visible_worktrees(cx)
-    }
-
-    pub fn worktree_scans_complete(&self, cx: &AppContext) -> impl Future<Output = ()> + 'static {
-        let futures = self
-            .worktrees(cx)
-            .filter_map(|worktree| worktree.read(cx).as_local())
-            .map(|worktree| worktree.scan_complete())
-            .collect::<Vec<_>>();
-        async move {
-            for future in futures {
-                future.await;
-            }
-        }
     }
 
     pub fn close_global(_: &CloseWindow, cx: &mut AppContext) {
@@ -2822,13 +2799,11 @@ impl Workspace {
     pub fn test_new(project: Model<Project>, cx: &mut ViewContext<Self>) -> Self {
         use node_runtime::FakeNodeRuntime;
 
-        let client = project.read(cx).client();
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
         cx.activate_window();
         let app_state = Arc::new(AppState {
             languages: project.read(cx).languages().clone(),
             workspace_store,
-            client,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: FakeNodeRuntime::new(),
@@ -3940,7 +3915,7 @@ mod tests {
         left_pane.update(cx, |pane, cx| {
             assert_eq!(
                 pane.active_item().unwrap().project_entry_ids(cx).as_slice(),
-                &[ProjectEntryId::from_proto(0)]
+                &[ProjectEntryId::from_usize(0)]
             );
         });
         cx.simulate_prompt_answer(0);
@@ -3949,7 +3924,7 @@ mod tests {
         left_pane.update(cx, |pane, cx| {
             assert_eq!(
                 pane.active_item().unwrap().project_entry_ids(cx).as_slice(),
-                &[ProjectEntryId::from_proto(2)]
+                &[ProjectEntryId::from_usize(2)]
             );
         });
         cx.simulate_prompt_answer(0);

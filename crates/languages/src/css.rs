@@ -7,7 +7,6 @@ use node_runtime::NodeRuntime;
 use serde_json::json;
 use smol::fs;
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
@@ -37,6 +36,8 @@ impl LspAdapter for CssLspAdapter {
         LanguageServerName("vscode-css-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -75,6 +76,7 @@ impl LspAdapter for CssLspAdapter {
             arguments: server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

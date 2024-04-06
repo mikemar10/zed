@@ -1,14 +1,14 @@
-use anyhow::{bail, Context, Result};
-use async_compression::futures::bufread::GzipDecoder;
+use anyhow::Context;
+
 use async_trait::async_trait;
-use futures::{io::BufReader, StreamExt};
+use futures::StreamExt;
 use language::{LanguageServerName, LspAdapter, LspAdapterDelegate};
 use lsp::LanguageServerBinary;
-use smol::fs::{self, File};
-use std::{any::Any, path::PathBuf};
-use util::github::latest_github_release;
+use smol::fs;
+use std::path::PathBuf;
+
 use util::maybe;
-use util::{github::GitHubLspBinaryVersion, ResultExt};
+use util::ResultExt;
 
 pub struct TaploLspAdapter;
 
@@ -18,6 +18,8 @@ impl LspAdapter for TaploLspAdapter {
         LanguageServerName("taplo-ls".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -85,6 +87,7 @@ impl LspAdapter for TaploLspAdapter {
             arguments: vec!["lsp".into(), "stdio".into()],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

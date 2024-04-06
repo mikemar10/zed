@@ -4348,38 +4348,6 @@ mod tests {
     }
 
     #[gpui::test]
-    fn test_remote(cx: &mut AppContext) {
-        let host_buffer =
-            cx.new_model(|cx| Buffer::new(0, BufferId::new(cx.entity_id().as_u64()).unwrap(), "a"));
-        let guest_buffer = cx.new_model(|cx| {
-            let state = host_buffer.read(cx).to_proto();
-            let ops = cx
-                .background_executor()
-                .block(host_buffer.read(cx).serialize_ops(None, cx));
-            let mut buffer = Buffer::from_proto(1, Capability::ReadWrite, state, None).unwrap();
-            buffer
-                .apply_ops(
-                    ops.into_iter()
-                        .map(|op| language::proto::deserialize_operation(op).unwrap()),
-                    cx,
-                )
-                .unwrap();
-            buffer
-        });
-        let multibuffer = cx.new_model(|cx| MultiBuffer::singleton(guest_buffer.clone(), cx));
-        let snapshot = multibuffer.read(cx).snapshot(cx);
-        assert_eq!(snapshot.text(), "a");
-
-        guest_buffer.update(cx, |buffer, cx| buffer.edit([(1..1, "b")], None, cx));
-        let snapshot = multibuffer.read(cx).snapshot(cx);
-        assert_eq!(snapshot.text(), "ab");
-
-        guest_buffer.update(cx, |buffer, cx| buffer.edit([(2..2, "c")], None, cx));
-        let snapshot = multibuffer.read(cx).snapshot(cx);
-        assert_eq!(snapshot.text(), "abc");
-    }
-
-    #[gpui::test]
     fn test_excerpt_boundaries_and_clipping(cx: &mut AppContext) {
         let buffer_1 = cx.new_model(|cx| {
             Buffer::new(

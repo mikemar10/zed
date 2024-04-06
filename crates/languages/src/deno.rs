@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use collections::HashMap;
 use futures::StreamExt;
@@ -8,13 +8,9 @@ use schemars::JsonSchema;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use settings::Settings;
-use smol::{fs, fs::File};
-use std::{any::Any, env::consts, ffi::OsString, path::PathBuf, sync::Arc};
-use util::{
-    fs::remove_matching,
-    github::{latest_github_release, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use smol::fs;
+use std::{ffi::OsString, path::PathBuf, sync::Arc};
+use util::{maybe, ResultExt};
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DenoSettings {
@@ -61,6 +57,8 @@ impl LspAdapter for DenoLspAdapter {
         LanguageServerName("deno-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -133,6 +131,7 @@ impl LspAdapter for DenoLspAdapter {
             arguments: deno_server_binary_arguments(),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

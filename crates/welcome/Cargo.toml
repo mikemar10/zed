@@ -16,7 +16,6 @@ test-support = []
 
 [dependencies]
 anyhow.workspace = true
-client.workspace = true
 db.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true

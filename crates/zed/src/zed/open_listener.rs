@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use cli::{ipc, IpcHandshake};
 use cli::{ipc::IpcSender, CliRequest, CliResponse};
-use client::parse_zed_link;
 use collections::HashMap;
 use editor::scroll::Autoscroll;
 use editor::Editor;
@@ -38,8 +37,6 @@ impl OpenRequest {
                 this.parse_file_path(file)
             } else if let Some(file) = url.strip_prefix("zed://file") {
                 this.parse_file_path(file)
-            } else if let Some(request_path) = parse_zed_link(&url) {
-                this.parse_request_path(request_path).log_err();
             } else {
                 log::error!("unhandled url: {}", url);
             }
@@ -56,33 +53,6 @@ impl OpenRequest {
                 self.open_paths.push(path_buf)
             }
         }
-    }
-
-    fn parse_request_path(&mut self, request_path: &str) -> Result<()> {
-        let mut parts = request_path.split('/');
-        if parts.next() == Some("channel") {
-            if let Some(slug) = parts.next() {
-                if let Some(id_str) = slug.split('-').last() {
-                    if let Ok(channel_id) = id_str.parse::<u64>() {
-                        let Some(next) = parts.next() else {
-                            self.join_channel = Some(channel_id);
-                            return Ok(());
-                        };
-
-                        if let Some(heading) = next.strip_prefix("notes#") {
-                            self.open_channel_notes
-                                .push((channel_id, Some(heading.to_string())));
-                            return Ok(());
-                        }
-                        if next == "notes" {
-                            self.open_channel_notes.push((channel_id, None));
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-        Err(anyhow!("invalid zed url: {}", request_path))
     }
 }
 

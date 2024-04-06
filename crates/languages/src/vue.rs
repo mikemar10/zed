@@ -1,4 +1,4 @@
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::StreamExt;
 pub use language::*;
@@ -7,17 +7,19 @@ use node_runtime::NodeRuntime;
 use parking_lot::Mutex;
 use smol::fs::{self};
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
 };
 use util::{maybe, ResultExt};
 
+// TODO disabled for now
+/*
 pub struct VueLspVersion {
     vue_version: String,
     ts_version: String,
 }
+*/
 
 pub struct VueLspAdapter {
     node: Arc<dyn NodeRuntime>,
@@ -43,6 +45,8 @@ impl super::LspAdapter for VueLspAdapter {
         LanguageServerName("vue-language-server".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -53,6 +57,8 @@ impl super::LspAdapter for VueLspAdapter {
             ts_version: self.node.npm_package_latest_version("typescript").await?,
         }) as Box<_>)
     }
+    */
+
     async fn initialization_options(
         self: Arc<Self>,
         _: &Arc<dyn LspAdapterDelegate>,
@@ -77,6 +83,8 @@ impl super::LspAdapter for VueLspAdapter {
             CodeActionKind::REFACTOR_REWRITE,
         ])
     }
+    // TODO disabled for now
+    /*
     async fn fetch_server_binary(
         &self,
         latest_version: Box<dyn 'static + Send + Any>,
@@ -142,6 +150,7 @@ impl super::LspAdapter for VueLspAdapter {
             arguments: vue_server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

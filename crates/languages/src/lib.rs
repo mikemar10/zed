@@ -26,12 +26,10 @@ mod json;
 mod lua;
 mod nu;
 mod ocaml;
-mod php;
 mod python;
 mod ruby;
 mod rust;
 mod tailwind;
-mod terraform;
 mod toml;
 mod typescript;
 mod vue;
@@ -316,13 +314,6 @@ pub fn init(
         vec![Arc::new(yaml::YamlLspAdapter::new(node_runtime.clone()))]
     );
     language!(
-        "php",
-        vec![
-            Arc::new(php::IntelephenseLspAdapter::new(node_runtime.clone())),
-            Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-        ]
-    );
-    language!(
         "elm",
         vec![Arc::new(elm::ElmLspAdapter::new(node_runtime.clone()))]
     );
@@ -336,12 +327,6 @@ pub fn init(
         vec![Arc::new(vue::VueLspAdapter::new(node_runtime.clone()))]
     );
     language!("proto");
-    language!("terraform", vec![Arc::new(terraform::TerraformLspAdapter)]);
-    language!(
-        "terraform-vars",
-        vec![Arc::new(terraform::TerraformLspAdapter)]
-    );
-    language!("hcl", vec![]);
     language!("dart", vec![Arc::new(dart::DartLanguageServer {})]);
 
     languages.register_secondary_lsp_adapter(

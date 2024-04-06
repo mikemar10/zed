@@ -1,13 +1,7 @@
-use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 pub use language::*;
 use lsp::LanguageServerBinary;
-use smol::fs::{self, File};
-use std::{any::Any, env::consts, path::PathBuf};
-use util::{
-    fs::remove_matching,
-    github::{latest_github_release, GitHubLspBinaryVersion},
-};
+use std::path::PathBuf;
 
 #[derive(Copy, Clone)]
 pub struct ClojureLspAdapter;
@@ -18,6 +12,8 @@ impl super::LspAdapter for ClojureLspAdapter {
         LanguageServerName("clojure-lsp".into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -105,6 +101,7 @@ impl super::LspAdapter for ClojureLspAdapter {
             arguments: vec![],
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

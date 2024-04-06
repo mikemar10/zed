@@ -1201,7 +1201,7 @@ impl Pane {
                 let start_abs_path = project
                     .update(cx, |project, cx| {
                         let worktree = project.visible_worktrees(cx).next()?;
-                        Some(worktree.read(cx).as_local()?.abs_path().to_path_buf())
+                        Some(worktree.read(cx).as_local().abs_path().to_path_buf())
                     })?
                     .unwrap_or_else(|| Path::new("").into());
 
@@ -1468,7 +1468,7 @@ impl Pane {
                         );
 
                     if let Some(entry) = single_entry_to_resolve {
-                        let entry_id = entry.to_proto();
+                        let entry_id = entry.to_usize() as u64;
                         menu = menu.separator().entry(
                             "Reveal In Project Panel",
                             Some(Box::new(RevealInProjectPanel {
@@ -1477,7 +1477,7 @@ impl Pane {
                             cx.handler_for(&pane, move |pane, cx| {
                                 pane.project.update(cx, |_, cx| {
                                     cx.emit(project::Event::RevealInProjectPanel(
-                                        ProjectEntryId::from_proto(entry_id),
+                                        ProjectEntryId::from_u64(entry_id),
                                     ))
                                 });
                             }),
@@ -1852,7 +1852,7 @@ impl Render for Pane {
                 cx.listener(|pane: &mut Self, action: &RevealInProjectPanel, cx| {
                     let entry_id = action
                         .entry_id
-                        .map(ProjectEntryId::from_proto)
+                        .map(ProjectEntryId::from_u64)
                         .or_else(|| pane.active_item()?.project_entry_ids(cx).first().copied());
                     if let Some(entry_id) = entry_id {
                         pane.project.update(cx, |_, cx| {

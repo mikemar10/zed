@@ -1,7 +1,6 @@
-use anyhow::{anyhow, bail, Context, Result};
-use async_compression::futures::bufread::GzipDecoder;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use futures::{io::BufReader, StreamExt};
+use futures::StreamExt;
 use gpui::AsyncAppContext;
 pub use language::*;
 use lazy_static::lazy_static;
@@ -9,17 +8,13 @@ use lsp::LanguageServerBinary;
 use project::project_settings::ProjectSettings;
 use regex::Regex;
 use settings::Settings;
-use smol::fs::{self, File};
-use std::{any::Any, borrow::Cow, env::consts, path::PathBuf, sync::Arc};
+use smol::fs;
+use std::{borrow::Cow, path::PathBuf, sync::Arc};
 use task::{
     static_source::{Definition, TaskDefinitions},
     TaskVariables,
 };
-use util::{
-    fs::remove_matching,
-    github::{latest_github_release, GitHubLspBinaryVersion},
-    maybe, ResultExt,
-};
+use util::{maybe, ResultExt};
 
 pub struct RustLspAdapter;
 
@@ -59,7 +54,8 @@ impl LspAdapter for RustLspAdapter {
             env: None,
         })
     }
-
+    // TODO disabling this for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         delegate: &dyn LspAdapterDelegate,
@@ -126,6 +122,7 @@ impl LspAdapter for RustLspAdapter {
             arguments: Default::default(),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,

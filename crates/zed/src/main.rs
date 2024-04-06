@@ -1,6 +1,3 @@
-// Allow binary to be called Zed for a nice application menu when running executable directly
-#![allow(non_snake_case)]
-
 mod zed;
 
 use anyhow::{anyhow, Context as _, Result};
@@ -8,7 +5,6 @@ use backtrace::Backtrace;
 use chrono::Utc;
 use clap::{command, Parser};
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{parse_zed_link, Client};
 use db::kvp::KEY_VALUE_STORE;
 use editor::Editor;
 use env_logger::Builder;
@@ -117,7 +113,6 @@ fn main() {
         handle_keymap_file_changes(user_keymap_file_rx, cx);
 
         let http = Arc::new(HttpClientWithUrl::new("http://unsupported.me"));
-        let client = client::Client::new(http.clone());
         let mut languages =
             LanguageRegistry::new(login_shell_env_loaded, cx.background_executor().clone());
         languages.set_language_server_download_dir(paths::LANGUAGES_DIR.clone());
@@ -128,27 +123,14 @@ fn main() {
         languages::init(languages.clone(), node_runtime.clone(), cx);
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
-        Client::set_global(client.clone(), cx);
-
         zed::init(cx);
         theme::init(theme::LoadThemes::All(Box::new(Assets)), cx);
-        project::Project::init(&client, cx);
+        project::Project::init(cx);
         command_palette::init(cx);
         language::init(cx);
         editor::init(cx);
         image_viewer::init(cx);
         diagnostics::init(cx);
-        assistant::init(client.clone(), cx);
-
-        extension::init(
-            fs.clone(),
-            client.clone(),
-            node_runtime.clone(),
-            languages.clone(),
-            ThemeRegistry::global(cx),
-            cx,
-        );
-
         load_user_themes_in_background(fs.clone(), cx);
         watch_themes(fs.clone(), cx);
 
@@ -166,7 +148,6 @@ fn main() {
 
         let app_state = Arc::new(AppState {
             languages: languages.clone(),
-            client: client.clone(),
             fs: fs.clone(),
             build_window_options,
             workspace_store,
@@ -193,7 +174,6 @@ fn main() {
         language_tools::init(cx);
         markdown_preview::init(cx);
         welcome::init(cx);
-        extensions_ui::init(cx);
 
         cx.set_menus(app_menus());
         initialize_workspace(app_state.clone(), cx);
@@ -585,8 +565,6 @@ fn parse_url_arg(arg: &str) -> Result<String> {
         Ok(path) => Ok(format!("file://{}", path.to_string_lossy())),
         Err(error) => {
             if arg.starts_with("file://") || arg.starts_with("zed-cli://") {
-                Ok(arg.into())
-            } else if let Some(_) = parse_zed_link(&arg) {
                 Ok(arg.into())
             } else {
                 Err(anyhow!("error parsing path argument: {}", error))

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::StreamExt;
 use gpui::AppContext;
@@ -10,7 +10,6 @@ use serde_json::Value;
 use settings::Settings;
 use smol::fs;
 use std::{
-    any::Any,
     ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
@@ -40,6 +39,8 @@ impl LspAdapter for ElmLspAdapter {
         LanguageServerName(SERVER_NAME.into())
     }
 
+    // TODO disabled for now
+    /*
     async fn fetch_latest_server_version(
         &self,
         _: &dyn LspAdapterDelegate,
@@ -78,6 +79,7 @@ impl LspAdapter for ElmLspAdapter {
             arguments: server_binary_arguments(&server_path),
         })
     }
+    */
 
     async fn cached_server_binary(
         &self,
