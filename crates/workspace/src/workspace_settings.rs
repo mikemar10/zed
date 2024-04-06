@@ -6,7 +6,6 @@ use settings::Settings;
 pub struct WorkspaceSettings {
     pub active_pane_magnification: f32,
     pub confirm_quit: bool,
-    pub show_call_status_icon: bool,
     pub autosave: AutosaveSetting,
 }
 
@@ -22,10 +21,6 @@ pub struct WorkspaceSettingsContent {
     ///
     /// Default: false
     pub confirm_quit: Option<bool>,
-    /// Whether or not to show the call status icon in the status bar.
-    ///
-    /// Default: true
-    pub show_call_status_icon: Option<bool>,
     /// When to automatically save edited buffers.
     ///
     /// Default: off
