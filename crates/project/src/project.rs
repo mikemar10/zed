@@ -966,9 +966,14 @@ impl Project {
         };
 
         cx.background_executor().spawn(async move {
-            wait_for_loading_buffer(loading_watch)
-                .await
-                .map_err(|e| Arc::into_inner(e).unwrap()) // TODO this unwrap feels precarious
+            match wait_for_loading_buffer(loading_watch)
+                .await {
+                    Ok(result) => Ok(result),
+                    Err(e) => {
+                        println!("error while opening buffer: {e:?}");
+                        Err(anyhow!("something went wrong"))
+                    }
+            }
         })
     }
 
@@ -4965,9 +4970,9 @@ impl Project {
         for tree in &self.worktrees {
             if let Some(tree) = tree.upgrade() {
                 let worktree = tree.read(cx).as_local();
-                // TODO: probably shouldn't just unwrap this
-                let relative_path = abs_path.strip_prefix(worktree.abs_path()).unwrap();
-                return Some((tree.clone(), relative_path.into()));
+                if let Ok(relative_path) = abs_path.strip_prefix(worktree.abs_path()) {
+                    return Some((tree.clone(), relative_path.into()));
+                }
             }
         }
         None
