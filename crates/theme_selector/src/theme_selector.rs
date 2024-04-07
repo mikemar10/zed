@@ -1,4 +1,3 @@
-use feature_flags::FeatureFlagAppExt;
 use fs::Fs;
 use fuzzy::{match_strings, StringMatch, StringMatchCandidate};
 use gpui::{
@@ -93,10 +92,9 @@ impl ThemeSelectorDelegate {
     ) -> Self {
         let original_theme = cx.theme().clone();
 
-        let staff_mode = cx.is_staff();
         let registry = ThemeRegistry::global(cx);
         let mut themes = registry
-            .list(staff_mode)
+            .list()
             .into_iter()
             .filter(|meta| {
                 if let Some(theme_filter) = themes_filter {

@@ -181,7 +181,7 @@ impl ThemeRegistry {
         names
     }
 
-    pub fn list(&self, _staff: bool) -> Vec<ThemeMeta> {
+    pub fn list(&self) -> Vec<ThemeMeta> {
         self.state
             .read()
             .themes

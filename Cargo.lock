@@ -1926,13 +1926,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6999dc1837253364c2ebb0704ba97994bd874e8f195d665c50b7548f6ea92764"
 
 [[package]]
-name = "feature_flags"
-version = "0.1.0"
-dependencies = [
- "gpui",
-]
-
-[[package]]
 name = "file_finder"
 version = "0.1.0"
 dependencies = [
@@ -2991,22 +2984,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "journal"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "editor",
- "gpui",
- "log",
- "schemars",
- "serde",
- "settings",
- "shellexpand",
- "workspace",
-]
-
-[[package]]
 name = "jpeg-decoder"
 version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3169,7 +3146,6 @@ dependencies = [
  "async-tar",
  "async-trait",
  "collections",
- "feature_flags",
  "futures 0.3.28",
  "gpui",
  "language",
@@ -5986,7 +5962,6 @@ dependencies = [
 name = "theme_selector"
 version = "0.1.0"
 dependencies = [
- "feature_flags",
  "fs",
  "fuzzy",
  "gpui",
@@ -7930,7 +7905,6 @@ dependencies = [
  "gpui",
  "image_viewer",
  "install_cli",
- "journal",
  "language",
  "language_selector",
  "language_tools",

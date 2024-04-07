@@ -11,7 +11,6 @@ members = [
     "crates/db",
     "crates/diagnostics",
     "crates/editor",
-    "crates/feature_flags",
     "crates/file_finder",
     "crates/fs",
     "crates/fsevent",
@@ -22,7 +21,6 @@ members = [
     "crates/gpui_macros",
     "crates/image_viewer",
     "crates/install_cli",
-    "crates/journal",
     "crates/language",
     "crates/language_selector",
     "crates/language_tools",
@@ -88,7 +86,6 @@ command_palette_hooks = { path = "crates/command_palette_hooks" }
 db = { path = "crates/db" }
 diagnostics = { path = "crates/diagnostics" }
 editor = { path = "crates/editor" }
-feature_flags = { path = "crates/feature_flags" }
 file_finder = { path = "crates/file_finder" }
 fs = { path = "crates/fs" }
 fsevent = { path = "crates/fsevent" }
@@ -99,7 +96,6 @@ gpui = { path = "crates/gpui" }
 gpui_macros = { path = "crates/gpui_macros" }
 install_cli = { path = "crates/install_cli" }
 image_viewer = { path = "crates/image_viewer" }
-journal = { path = "crates/journal" }
 language = { path = "crates/language" }
 language_selector = { path = "crates/language_selector" }
 language_tools = { path = "crates/language_tools" }
