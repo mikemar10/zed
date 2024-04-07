@@ -1,7 +1,6 @@
 use anyhow::Context;
 use gpui::AppContext;
 pub use language::*;
-use node_runtime::NodeRuntime;
 use rust_embed::RustEmbed;
 use settings::Settings;
 use std::{str, sync::Arc};
@@ -14,26 +13,15 @@ use self::{deno::DenoSettings, elixir::ElixirSettings};
 mod c;
 mod clojure;
 mod csharp;
-mod css;
-mod dart;
 mod deno;
 mod elixir;
-mod elm;
 mod erlang;
 mod go;
-mod html;
-mod json;
 mod lua;
 mod nu;
-mod ocaml;
-mod python;
 mod ruby;
 mod rust;
-mod tailwind;
 mod toml;
-mod typescript;
-mod vue;
-mod yaml;
 mod zig;
 
 // 1. Add tree-sitter-{language} parser to zed crate
@@ -50,11 +38,7 @@ mod zig;
 #[exclude = "*.rs"]
 struct LanguageDir;
 
-pub fn init(
-    languages: Arc<LanguageRegistry>,
-    node_runtime: Arc<dyn NodeRuntime>,
-    cx: &mut AppContext,
-) {
+pub fn init(languages: Arc<LanguageRegistry>, cx: &mut AppContext) {
     ElixirSettings::register(cx);
     DenoSettings::register(cx);
 
@@ -66,17 +50,11 @@ pub fn init(
         ("cpp", tree_sitter_cpp::language()),
         ("css", tree_sitter_css::language()),
         ("elixir", tree_sitter_elixir::language()),
-        ("elm", tree_sitter_elm::language()),
-        (
-            "embedded_template",
-            tree_sitter_embedded_template::language(),
-        ),
         ("erlang", tree_sitter_erlang::language()),
         ("glsl", tree_sitter_glsl::language()),
         ("go", tree_sitter_go::language()),
         ("gomod", tree_sitter_gomod::language()),
         ("gowork", tree_sitter_gowork::language()),
-        ("hcl", tree_sitter_hcl::language()),
         ("heex", tree_sitter_heex::language()),
         ("html", tree_sitter_html::language()),
         ("jsdoc", tree_sitter_jsdoc::language()),
@@ -85,12 +63,6 @@ pub fn init(
         ("markdown", tree_sitter_markdown::language()),
         ("nix", tree_sitter_nix::language()),
         ("nu", tree_sitter_nu::language()),
-        ("ocaml", tree_sitter_ocaml::language_ocaml()),
-        (
-            "ocaml_interface",
-            tree_sitter_ocaml::language_ocaml_interface(),
-        ),
-        ("php", tree_sitter_php::language_php()),
         ("proto", tree_sitter_proto::language()),
         ("python", tree_sitter_python::language()),
         ("racket", tree_sitter_racket::language()),
@@ -104,7 +76,6 @@ pub fn init(
         ("vue", tree_sitter_vue::language()),
         ("yaml", tree_sitter_yaml::language()),
         ("zig", tree_sitter_zig::language()),
-        ("dart", tree_sitter_dart::language()),
     ]);
 
     macro_rules! language {
@@ -169,22 +140,12 @@ pub fn init(
     language!("clojure", vec![Arc::new(clojure::ClojureLspAdapter)]);
     language!("cpp", vec![Arc::new(c::CLspAdapter)]);
     language!("csharp", vec![Arc::new(csharp::OmniSharpAdapter {})]);
-    language!(
-        "css",
-        vec![
-            Arc::new(css::CssLspAdapter::new(node_runtime.clone())),
-            Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-        ]
-    );
 
     match &ElixirSettings::get(None, cx).lsp {
         elixir::ElixirLspSetting::ElixirLs => {
             language!(
                 "elixir",
-                vec![
-                    Arc::new(elixir::ElixirLspAdapter),
-                    Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-                ],
+                vec![Arc::new(elixir::ElixirLspAdapter),],
                 elixir_task_context()
             );
         }
@@ -211,132 +172,31 @@ pub fn init(
     language!("gomod");
     language!("gowork");
     language!("zig", vec![Arc::new(zig::ZlsAdapter)]);
-    language!(
-        "heex",
-        vec![
-            Arc::new(elixir::ElixirLspAdapter),
-            Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-        ]
-    );
-    language!(
-        "json",
-        vec![Arc::new(json::JsonLspAdapter::new(
-            node_runtime.clone(),
-            languages.clone(),
-        ))]
-    );
+    language!("heex", vec![Arc::new(elixir::ElixirLspAdapter),]);
     language!("markdown");
-    language!(
-        "python",
-        vec![Arc::new(python::PythonLspAdapter::new(
-            node_runtime.clone(),
-        ))]
-    );
     language!(
         "rust",
         vec![Arc::new(rust::RustLspAdapter)],
         RustContextProvider
     );
     language!("toml", vec![Arc::new(toml::TaploLspAdapter)]);
-    match &DenoSettings::get(None, cx).enable {
-        true => {
-            language!(
-                "tsx",
-                vec![
-                    Arc::new(deno::DenoLspAdapter::new()),
-                    Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-                ]
-            );
-            language!("typescript", vec![Arc::new(deno::DenoLspAdapter::new())]);
-            language!(
-                "javascript",
-                vec![
-                    Arc::new(deno::DenoLspAdapter::new()),
-                    Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-                ]
-            );
-            language!("jsdoc", vec![Arc::new(deno::DenoLspAdapter::new())]);
-        }
-        false => {
-            language!(
-                "tsx",
-                vec![
-                    Arc::new(typescript::TypeScriptLspAdapter::new(node_runtime.clone())),
-                    Arc::new(typescript::EsLintLspAdapter::new(node_runtime.clone())),
-                    Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-                ]
-            );
-            language!(
-                "typescript",
-                vec![
-                    Arc::new(typescript::TypeScriptLspAdapter::new(node_runtime.clone())),
-                    Arc::new(typescript::EsLintLspAdapter::new(node_runtime.clone())),
-                ]
-            );
-            language!(
-                "javascript",
-                vec![
-                    Arc::new(typescript::TypeScriptLspAdapter::new(node_runtime.clone())),
-                    Arc::new(typescript::EsLintLspAdapter::new(node_runtime.clone())),
-                    Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-                ]
-            );
-            language!(
-                "jsdoc",
-                vec![Arc::new(typescript::TypeScriptLspAdapter::new(
-                    node_runtime.clone(),
-                ))]
-            );
-        }
+    if DenoSettings::get(None, cx).enable {
+        language!("tsx", vec![Arc::new(deno::DenoLspAdapter::new()),]);
+        language!("typescript", vec![Arc::new(deno::DenoLspAdapter::new())]);
+        language!("javascript", vec![Arc::new(deno::DenoLspAdapter::new()),]);
+        language!("jsdoc", vec![Arc::new(deno::DenoLspAdapter::new())]);
     }
 
-    language!(
-        "html",
-        vec![
-            Arc::new(html::HtmlLspAdapter::new(node_runtime.clone())),
-            Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-        ]
-    );
     language!("ruby", vec![Arc::new(ruby::RubyLanguageServer)]);
-    language!(
-        "erb",
-        vec![
-            Arc::new(ruby::RubyLanguageServer),
-            Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-        ]
-    );
+    language!("erb", vec![Arc::new(ruby::RubyLanguageServer),]);
     language!("scheme");
     language!("racket");
     language!("regex");
     language!("lua", vec![Arc::new(lua::LuaLspAdapter)]);
-    language!(
-        "yaml",
-        vec![Arc::new(yaml::YamlLspAdapter::new(node_runtime.clone()))]
-    );
-    language!(
-        "elm",
-        vec![Arc::new(elm::ElmLspAdapter::new(node_runtime.clone()))]
-    );
     language!("glsl");
     language!("nix");
     language!("nu", vec![Arc::new(nu::NuLanguageServer {})]);
-    language!("ocaml", vec![Arc::new(ocaml::OCamlLspAdapter)]);
-    language!("ocaml-interface", vec![Arc::new(ocaml::OCamlLspAdapter)]);
-    language!(
-        "vue",
-        vec![Arc::new(vue::VueLspAdapter::new(node_runtime.clone()))]
-    );
     language!("proto");
-    language!("dart", vec![Arc::new(dart::DartLanguageServer {})]);
-
-    languages.register_secondary_lsp_adapter(
-        "Astro".into(),
-        Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-    );
-    languages.register_secondary_lsp_adapter(
-        "Svelte".into(),
-        Arc::new(tailwind::TailwindLspAdapter::new(node_runtime.clone())),
-    );
 }
 
 #[cfg(any(test, feature = "test-support"))]

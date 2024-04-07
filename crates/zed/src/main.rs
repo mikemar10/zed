@@ -17,7 +17,6 @@ use log::LevelFilter;
 
 use assets::Assets;
 use mimalloc::MiMalloc;
-use node_runtime::RealNodeRuntime;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use settings::{default_settings, handle_settings_file_changes, watch_config_file, SettingsStore};
@@ -36,7 +35,7 @@ use std::{
     thread,
 };
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry, ThemeSettings};
-use util::{http::HttpClientWithUrl, maybe, paths, ResultExt};
+use util::{maybe, paths, ResultExt};
 use welcome::{show_welcome_view, FIRST_OPEN};
 use workspace::{AppState, WorkspaceStore};
 use zed::{
@@ -112,15 +111,13 @@ fn main() {
         handle_settings_file_changes(user_settings_file_rx, cx);
         handle_keymap_file_changes(user_keymap_file_rx, cx);
 
-        let http = Arc::new(HttpClientWithUrl::new("http://unsupported.me"));
         let mut languages =
             LanguageRegistry::new(login_shell_env_loaded, cx.background_executor().clone());
         languages.set_language_server_download_dir(paths::LANGUAGES_DIR.clone());
         let languages = Arc::new(languages);
-        let node_runtime = RealNodeRuntime::new(http.clone());
 
         language::init(cx);
-        languages::init(languages.clone(), node_runtime.clone(), cx);
+        languages::init(languages.clone(), cx);
         let workspace_store = cx.new_model(|_| WorkspaceStore::new());
 
         zed::init(cx);
@@ -151,7 +148,6 @@ fn main() {
             fs: fs.clone(),
             build_window_options,
             workspace_store,
-            node_runtime,
         });
         AppState::set_global(Arc::downgrade(&app_state), cx);
 

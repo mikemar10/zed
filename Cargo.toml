@@ -18,7 +18,6 @@ members = [
     "crates/fuzzy",
     "crates/git",
     "crates/go_to_line",
-    "crates/google_ai",
     "crates/gpui",
     "crates/gpui_macros",
     "crates/image_viewer",
@@ -33,10 +32,8 @@ members = [
     "crates/media",
     "crates/menu",
     "crates/multi_buffer",
-    "crates/node_runtime",
     "crates/outline",
     "crates/picker",
-    "crates/prettier",
     "crates/project",
     "crates/project_panel",
     "crates/project_symbols",
@@ -79,7 +76,6 @@ resolver = "2"
 
 [workspace.dependencies]
 activity_indicator = { path = "crates/activity_indicator" }
-ai = { path = "crates/ai" }
 assets = { path = "crates/assets" }
 base64 = "0.13"
 breadcrumbs = { path = "crates/breadcrumbs" }
@@ -99,7 +95,6 @@ fsevent = { path = "crates/fsevent" }
 fuzzy = { path = "crates/fuzzy" }
 git = { path = "crates/git" }
 go_to_line = { path = "crates/go_to_line" }
-google_ai = { path = "crates/google_ai" }
 gpui = { path = "crates/gpui" }
 gpui_macros = { path = "crates/gpui_macros" }
 install_cli = { path = "crates/install_cli" }
@@ -114,12 +109,10 @@ markdown_preview = { path = "crates/markdown_preview" }
 media = { path = "crates/media" }
 menu = { path = "crates/menu" }
 multi_buffer = { path = "crates/multi_buffer" }
-node_runtime = { path = "crates/node_runtime" }
 outline = { path = "crates/outline" }
 picker = { path = "crates/picker" }
 plugin = { path = "crates/plugin" }
 plugin_macros = { path = "crates/plugin_macros" }
-prettier = { path = "crates/prettier" }
 project = { path = "crates/project" }
 worktree = { path = "crates/worktree" }
 project_panel = { path = "crates/project_panel" }
@@ -180,11 +173,6 @@ globset = "0.4"
 hex = "0.4.3"
 ignore = "0.4.22"
 indoc = "1"
-# We explicitly disable http2 support in isahc.
-isahc = { version = "1.7.2", default-features = false, features = [
-    "static-curl",
-    "text-decoding",
-] }
 itertools = "0.11.0"
 lazy_static = "1.4.0"
 linkify = "0.10.0"
@@ -195,9 +183,6 @@ parking_lot = "0.12.1"
 profiling = "1"
 postage = { version = "0.5", features = ["futures-traits"] }
 pretty_assertions = "1.3.0"
-prost = "0.9"
-prost-build = "0.9"
-prost-types = "0.9"
 pulldown-cmark = { version = "0.10.0", default-features = false }
 rand = "0.8.5"
 refineable = { path = "./crates/refineable" }
@@ -223,7 +208,6 @@ subtle = "2.5.0"
 sysinfo = "0.30.7"
 tempfile = "3.9.0"
 thiserror = "1.0.29"
-tiktoken-rs = "0.5.7"
 time = { version = "0.3", features = [
     "serde",
     "serde-well-known",
@@ -231,24 +215,20 @@ time = { version = "0.3", features = [
 ] }
 toml = "0.8"
 tokio = { version = "1", features = ["full"] }
-tower-http = "0.4.4"
-tree-sitter = { version = "0.20", features = ["wasm"] }
+tree-sitter = { version = "0.20" }
 tree-sitter-bash = { git = "https://github.com/tree-sitter/tree-sitter-bash", rev = "7331995b19b8f8aba2d5e26deb51d2195c18bc94" }
 tree-sitter-c = "0.20.1"
 tree-sitter-clojure = { git = "https://github.com/prcastro/tree-sitter-clojure", branch = "update-ts" }
 tree-sitter-c-sharp = { git = "https://github.com/tree-sitter/tree-sitter-c-sharp", rev = "dd5e59721a5f8dae34604060833902b882023aaf" }
 tree-sitter-cpp = { git = "https://github.com/tree-sitter/tree-sitter-cpp", rev = "f44509141e7e483323d2ec178f2d2e6c0fc041c1" }
 tree-sitter-css = { git = "https://github.com/tree-sitter/tree-sitter-css", rev = "769203d0f9abe1a9a691ac2b9fe4bb4397a73c51" }
-tree-sitter-dart = { git = "https://github.com/agent3bood/tree-sitter-dart", rev = "48934e3bf757a9b78f17bdfaa3e2b4284656fdc7" }
 tree-sitter-elixir = { git = "https://github.com/elixir-lang/tree-sitter-elixir", rev = "a2861e88a730287a60c11ea9299c033c7d076e30" }
-tree-sitter-elm = { git = "https://github.com/elm-tooling/tree-sitter-elm", rev = "692c50c0b961364c40299e73c1306aecb5d20f40" }
 tree-sitter-embedded-template = "0.20.0"
 tree-sitter-erlang = "0.4.0"
 tree-sitter-glsl = { git = "https://github.com/theHamsta/tree-sitter-glsl", rev = "2a56fb7bc8bb03a1892b4741279dd0a8758b7fb3" }
 tree-sitter-go = { git = "https://github.com/tree-sitter/tree-sitter-go", rev = "aeb2f33b366fd78d5789ff104956ce23508b85db" }
 tree-sitter-gomod = { git = "https://github.com/camdencheek/tree-sitter-go-mod" }
 tree-sitter-gowork = { git = "https://github.com/d1y/tree-sitter-go-work" }
-tree-sitter-hcl = { git = "https://github.com/MichaHoffmann/tree-sitter-hcl", rev = "v1.1.0" }
 rustc-demangle = "0.1.23"
 tree-sitter-heex = { git = "https://github.com/phoenixframework/tree-sitter-heex", rev = "2e1348c3cf2c9323e87c2744796cf3f3868aa82a" }
 tree-sitter-html = "0.19.0"
@@ -258,8 +238,6 @@ tree-sitter-lua = "0.0.14"
 tree-sitter-markdown = { git = "https://github.com/MDeiml/tree-sitter-markdown", rev = "330ecab87a3e3a7211ac69bbadc19eabecdb1cca" }
 tree-sitter-nix = { git = "https://github.com/nix-community/tree-sitter-nix", rev = "66e3e9ce9180ae08fc57372061006ef83f0abde7" }
 tree-sitter-nu = { git = "https://github.com/nushell/tree-sitter-nu", rev = "7dd29f9616822e5fc259f5b4ae6c4ded9a71a132" }
-tree-sitter-ocaml = { git = "https://github.com/tree-sitter/tree-sitter-ocaml", rev = "4abfdc1c7af2c6c77a370aee974627be1c285b3b" }
-tree-sitter-php = "0.21.1"
 tree-sitter-proto = { git = "https://github.com/rewinfrey/tree-sitter-proto", rev = "36d54f288aee112f13a67b550ad32634d0c2cb52" }
 tree-sitter-python = "0.20.2"
 tree-sitter-racket = { git = "https://github.com/zed-industries/tree-sitter-racket", rev = "eb010cf2c674c6fd9a6316a84e28ef90190fe51a" }
@@ -276,18 +254,7 @@ unindent = "0.1.7"
 unicase = "2.6"
 url = "2.2"
 uuid = { version = "1.1.2", features = ["v4"] }
-wasmparser = "0.201"
-wasm-encoder = "0.201"
-wasmtime = { version = "19.0.0", default-features = false, features = [
-    "async",
-    "demangle",
-    "runtime",
-    "cranelift",
-    "component-model",
-] }
-wasmtime-wasi = "19.0.0"
 which = "6.0.0"
-wit-component = "0.201"
 sys-locale = "0.3.1"
 
 [workspace.dependencies.windows]
@@ -331,11 +298,8 @@ debug = "limited"
 
 [profile.dev.package]
 taffy = { opt-level = 3 }
-cranelift-codegen = { opt-level = 3 }
 rustybuzz = { opt-level = 3 }
 ttf-parser = { opt-level = 3 }
-wasmtime-cranelift = { opt-level = 3 }
-wasmtime = { opt-level = 3 }
 
 [profile.release]
 debug = "limited"

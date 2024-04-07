@@ -27,12 +27,6 @@ git submodule update --init --recursive
   sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
   ```
 
-* Install the Rust wasm toolchain:
-
-  ```bash
-  rustup target add wasm32-wasi
-  ```
-
 ## Backend Dependencies
 
 If you are developing collaborative features of Zed, you'll need to install the dependencies of zed's `collab` server:

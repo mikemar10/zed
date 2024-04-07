@@ -17,7 +17,6 @@ test-support = [
     "language/test-support",
     "settings/test-support",
     "text/test-support",
-    "prettier/test-support",
     "worktree/test-support",
     "gpui/test-support",
 ]
@@ -37,10 +36,8 @@ itertools.workspace = true
 language.workspace = true
 log.workspace = true
 lsp.workspace = true
-node_runtime.workspace = true
 parking_lot.workspace = true
 postage.workspace = true
-prettier.workspace = true
 worktree.workspace = true
 rand.workspace = true
 regex.workspace = true
@@ -65,7 +62,6 @@ git2.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
 language = { workspace = true, features = ["test-support"] }
 lsp = { workspace = true, features = ["test-support"] }
-prettier = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true
 worktree = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }

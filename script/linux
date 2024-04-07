@@ -2,9 +2,6 @@
 
 set -e
 
-# install the wasm toolchain
-rustup target add wasm32-wasi
-
 # if sudo is not installed, define an empty alias
 maysudo=$(command -v sudo || command -v doas || true)
 

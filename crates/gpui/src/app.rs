@@ -22,10 +22,7 @@ pub use entity_map::*;
 pub use model_context::*;
 #[cfg(any(test, feature = "test-support"))]
 pub use test_context::*;
-use util::{
-    http::{self, HttpClient},
-    ResultExt,
-};
+use util::ResultExt;
 
 use crate::{
     current_platform, image_cache::ImageCache, init_app_menus, Action, ActionRegistry, Any,
@@ -114,11 +111,7 @@ impl App {
         #[cfg(any(test, feature = "test-support"))]
         log::info!("GPUI was compiled in test mode");
 
-        Self(AppContext::new(
-            current_platform(),
-            Arc::new(()),
-            http::client(),
-        ))
+        Self(AppContext::new(current_platform(), Arc::new(())))
     }
 
     /// Assign
@@ -243,7 +236,6 @@ impl AppContext {
     pub(crate) fn new(
         platform: Rc<dyn Platform>,
         asset_source: Arc<dyn AssetSource>,
-        http_client: Arc<dyn HttpClient>,
     ) -> Rc<AppCell> {
         let executor = platform.background_executor();
         let foreground_executor = platform.foreground_executor();
@@ -275,7 +267,7 @@ impl AppContext {
                 foreground_executor,
                 svg_renderer: SvgRenderer::new(asset_source.clone()),
                 asset_source,
-                image_cache: ImageCache::new(http_client),
+                image_cache: ImageCache::new(),
                 globals_by_type: FxHashMap::default(),
                 entities,
                 new_view_observers: SubscriberSet::new(),

@@ -16,7 +16,6 @@ accepted = [
 ]
 workarounds = [
     "ring",
-    "wasmtime",
 ]
 
 [procinfo.clarify]

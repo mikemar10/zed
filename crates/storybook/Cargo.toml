@@ -21,6 +21,11 @@ editor.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true
 indoc.workspace = true
+# We explicitly disable http2 support in isahc.
+isahc = { version = "1.7.2", default-features = false, features = [
+    "static-curl",
+    "text-decoding",
+] }
 language.workspace = true
 log.workspace = true
 menu.workspace = true

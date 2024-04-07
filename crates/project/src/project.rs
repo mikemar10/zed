@@ -1,7 +1,6 @@
 pub mod debounced_delay;
 pub mod lsp_command;
 pub mod lsp_ext_command;
-mod prettier_support;
 pub mod project_settings;
 pub mod search;
 mod task_inventory;
@@ -44,10 +43,8 @@ use lsp::{
     MessageActionItem, OneOf, ServerHealthStatus, ServerStatus,
 };
 use lsp_command::*;
-use node_runtime::NodeRuntime;
 use parking_lot::{Mutex, RwLock};
 use postage::watch;
-use prettier_support::{DefaultPrettier, PrettierInstance};
 use project_settings::{LspSettings, ProjectSettings};
 use rand::prelude::*;
 use worktree::Snapshot;
@@ -91,8 +88,7 @@ use worktree::Traversal;
 
 pub use fs::*;
 pub use language::Location;
-#[cfg(any(test, feature = "test-support"))]
-pub use prettier::FORMAT_SUFFIX as TEST_PRETTIER_FORMAT_SUFFIX;
+
 #[cfg(feature = "test-support")]
 pub use task_inventory::test_inventory::*;
 pub use task_inventory::{Inventory, TaskSourceKind};
@@ -171,10 +167,6 @@ pub struct Project {
     _maintain_workspace_config: Task<Result<()>>,
     terminals: Terminals,
     current_lsp_settings: HashMap<Arc<str>, LspSettings>,
-    node: Option<Arc<dyn NodeRuntime>>,
-    default_prettier: DefaultPrettier,
-    prettiers_per_worktree: HashMap<WorktreeId, HashSet<Option<PathBuf>>>,
-    prettier_instances: HashMap<PathBuf, PrettierInstance>,
     tasks: Model<Inventory>,
 }
 
@@ -410,7 +402,6 @@ pub enum FormatTrigger {
 enum FormatOperation {
     Lsp(Vec<(Range<Anchor>, String)>),
     External(Diff),
-    Prettier(Diff),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -465,7 +456,6 @@ impl Project {
     }
 
     pub fn local(
-        node: Arc<dyn NodeRuntime>,
         languages: Arc<LanguageRegistry>,
         fs: Arc<dyn Fs>,
         cx: &mut AppContext,
@@ -510,10 +500,6 @@ impl Project {
                     local_handles: Vec::new(),
                 },
                 current_lsp_settings: ProjectSettings::get_global(cx).lsp.clone(),
-                node: Some(node),
-                default_prettier: DefaultPrettier::default(),
-                prettiers_per_worktree: HashMap::default(),
-                prettier_instances: HashMap::default(),
                 tasks,
             }
         })
@@ -547,14 +533,7 @@ impl Project {
         cx: &mut gpui::TestAppContext,
     ) -> Model<Project> {
         let languages = LanguageRegistry::test(cx.executor());
-        let project = cx.update(|cx| {
-            Project::local(
-                node_runtime::FakeNodeRuntime::new(),
-                Arc::new(languages),
-                fs,
-                cx,
-            )
-        });
+        let project = cx.update(|cx| Project::local(Arc::new(languages), fs, cx));
         for path in root_paths {
             let (tree, _) = project
                 .update(cx, |project, cx| {
@@ -641,21 +620,6 @@ impl Project {
         for (worktree_id, adapter_name) in language_servers_to_stop {
             self.stop_language_server(worktree_id, adapter_name, cx)
                 .detach();
-        }
-
-        let mut prettier_plugins_by_worktree = HashMap::default();
-        for (worktree, language, settings) in language_formatters_to_check {
-            if let Some(plugins) =
-                prettier_support::prettier_plugins_for_language(&language, &settings)
-            {
-                prettier_plugins_by_worktree
-                    .entry(worktree)
-                    .or_insert_with(|| HashSet::default())
-                    .extend(plugins.iter().cloned());
-            }
-        }
-        for (worktree, prettier_plugins) in prettier_plugins_by_worktree {
-            self.install_default_prettier(worktree, prettier_plugins.into_iter(), cx);
         }
 
         // Start all the newly-enabled language servers.
@@ -1814,14 +1778,7 @@ impl Project {
         });
 
         let buffer_file = buffer.read(cx).file().cloned();
-        let settings = language_settings(Some(&new_language), buffer_file.as_ref(), cx).clone();
         let buffer_file = File::from_dyn(buffer_file.as_ref());
-        let worktree = buffer_file.as_ref().map(|f| f.worktree_id(cx));
-        if let Some(prettier_plugins) =
-            prettier_support::prettier_plugins_for_language(&new_language, &settings)
-        {
-            self.install_default_prettier(worktree, prettier_plugins.iter().cloned(), cx);
-        };
         if let Some(file) = buffer_file {
             let worktree = file.worktree.clone();
             if worktree.read(cx).is_local() {
@@ -3455,12 +3412,7 @@ impl Project {
                     }
                 }
                 (Formatter::Auto, FormatOnSave::On | FormatOnSave::Off) => {
-                    let prettier =
-                        prettier_support::format_with_prettier(&project, buffer, &mut cx).await;
-
-                    if let Some(operation) = prettier {
-                        format_operation = Some(operation?);
-                    } else if let Some((language_server, buffer_abs_path)) = server_and_buffer {
+                    if let Some((language_server, buffer_abs_path)) = server_and_buffer {
                         format_operation = Some(FormatOperation::Lsp(
                             Self::format_via_lsp(
                                 &project,
@@ -3473,14 +3425,6 @@ impl Project {
                             .await
                             .context("failed to format via language server")?,
                         ));
-                    }
-                }
-                (Formatter::Prettier, FormatOnSave::On | FormatOnSave::Off) => {
-                    let prettier =
-                        prettier_support::format_with_prettier(&project, buffer, &mut cx).await;
-
-                    if let Some(operation) = prettier {
-                        format_operation = Some(operation?);
                     }
                 }
             };
@@ -3505,9 +3449,6 @@ impl Project {
                             b.edit(edits, None, cx);
                         }
                         FormatOperation::External(diff) => {
-                            b.apply_diff(diff, cx);
-                        }
-                        FormatOperation::Prettier(diff) => {
                             b.apply_diff(diff, cx);
                         }
                     }
@@ -5100,35 +5041,6 @@ impl Project {
             cx.emit(Event::LanguageServerRemoved(server_id_to_remove));
         }
 
-        let mut prettier_instances_to_clean = FuturesUnordered::new();
-        if let Some(prettier_paths) = self.prettiers_per_worktree.remove(&id_to_remove) {
-            for path in prettier_paths.iter().flatten() {
-                if let Some(prettier_instance) = self.prettier_instances.remove(path) {
-                    prettier_instances_to_clean.push(async move {
-                        prettier_instance
-                            .server()
-                            .await
-                            .map(|server| server.server_id())
-                    });
-                }
-            }
-        }
-        cx.spawn(|project, mut cx| async move {
-            while let Some(prettier_server_id) = prettier_instances_to_clean.next().await {
-                if let Some(prettier_server_id) = prettier_server_id {
-                    project
-                        .update(&mut cx, |project, cx| {
-                            project
-                                .supplementary_language_servers
-                                .remove(&prettier_server_id);
-                            cx.emit(Event::LanguageServerRemoved(prettier_server_id));
-                        })
-                        .ok();
-                }
-            }
-        })
-        .detach();
-
         self.task_inventory().update(cx, |inventory, _| {
             inventory.remove_worktree_sources(id_to_remove);
         });
@@ -5159,7 +5071,6 @@ impl Project {
                         this.update_local_worktree_buffers(&worktree, changes, cx);
                         this.update_local_worktree_language_servers(&worktree, changes, cx);
                         this.update_local_worktree_settings(&worktree, changes, cx);
-                        this.update_prettier_settings(&worktree, changes, cx);
                     }
 
                     cx.emit(Event::WorktreeUpdatedEntries(

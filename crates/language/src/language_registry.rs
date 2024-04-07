@@ -1,7 +1,7 @@
 use crate::{
     language_settings::all_language_settings, task_context::ContextProvider, CachedLspAdapter,
     File, Language, LanguageConfig, LanguageId, LanguageMatcher, LanguageServerName, LspAdapter,
-    LspAdapterDelegate, PARSER, PLAIN_TEXT,
+    LspAdapterDelegate, PLAIN_TEXT,
 };
 use anyhow::{anyhow, Context as _, Result};
 use collections::{hash_map, HashMap};
@@ -14,18 +14,12 @@ use gpui::{AppContext, BackgroundExecutor, Task};
 use lsp::LanguageServerId;
 use parking_lot::{Mutex, RwLock};
 use postage::watch;
-use std::{
-    borrow::Cow,
-    ffi::OsStr,
-    ops::Not,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{borrow::Cow, ops::Not, path::Path, sync::Arc};
 use sum_tree::Bias;
 use text::{Point, Rope};
 use theme::Theme;
 use unicase::UniCase;
-use util::{maybe, paths::PathExt, post_inc, ResultExt};
+use util::{paths::PathExt, post_inc, ResultExt};
 
 pub struct LanguageRegistry {
     state: RwLock<LanguageRegistryState>,
@@ -39,7 +33,7 @@ struct LanguageRegistryState {
     next_language_server_id: usize,
     languages: Vec<Arc<Language>>,
     available_languages: Vec<AvailableLanguage>,
-    grammars: HashMap<Arc<str>, AvailableGrammar>,
+    grammars: HashMap<Arc<str>, Grammar>,
     lsp_adapters: HashMap<Arc<str>, Vec<Arc<CachedLspAdapter>>>,
     loading_languages: HashMap<LanguageId, Vec<oneshot::Sender<Result<Arc<Language>>>>>,
     subscription: (watch::Sender<()>, watch::Receiver<()>),
@@ -85,16 +79,7 @@ struct AvailableLanguage {
     loaded: bool,
 }
 
-enum AvailableGrammar {
-    Native(tree_sitter::Language),
-    Loaded(#[allow(unused)] PathBuf, tree_sitter::Language),
-    Loading(
-        #[allow(unused)] PathBuf,
-        Vec<oneshot::Sender<Result<tree_sitter::Language, Arc<anyhow::Error>>>>,
-    ),
-    Unloaded(PathBuf),
-    LoadFailed(Arc<anyhow::Error>),
-}
+struct Grammar(tree_sitter::Language);
 
 #[derive(Debug)]
 pub struct LanguageNotFound;
@@ -308,24 +293,8 @@ impl LanguageRegistry {
         self.state.write().grammars.extend(
             grammars
                 .into_iter()
-                .map(|(name, grammar)| (name.into(), AvailableGrammar::Native(grammar))),
+                .map(|(name, grammar)| (name.into(), Grammar(grammar))),
         );
-    }
-
-    /// Adds paths to WASM grammar files, which can be loaded if needed.
-    pub fn register_wasm_grammars(
-        &self,
-        grammars: impl IntoIterator<Item = (impl Into<Arc<str>>, PathBuf)>,
-    ) {
-        let mut state = self.state.write();
-        state.grammars.extend(
-            grammars
-                .into_iter()
-                .map(|(name, path)| (name.into(), AvailableGrammar::Unloaded(path))),
-        );
-        state.version += 1;
-        state.reload_count += 1;
-        *state.subscription.0.borrow_mut() = ();
     }
 
     pub fn language_names(&self) -> Vec<String> {
@@ -534,7 +503,7 @@ impl LanguageRegistry {
                             let (config, queries, provider) = (language.load)()?;
 
                             if let Some(grammar) = config.grammar.clone() {
-                                let grammar = Some(this.get_or_load_grammar(grammar).await?);
+                                let grammar = Some(this.get_or_load_grammar(grammar)?);
                                 Language::new_with_id(id, config, grammar)
                                     .with_context_provider(provider)
                                     .with_queries(queries)
@@ -582,67 +551,13 @@ impl LanguageRegistry {
         rx
     }
 
-    fn get_or_load_grammar(
-        self: &Arc<Self>,
-        name: Arc<str>,
-    ) -> impl Future<Output = Result<tree_sitter::Language>> {
-        let (tx, rx) = oneshot::channel();
+    fn get_or_load_grammar(self: &Arc<Self>, name: Arc<str>) -> Result<tree_sitter::Language> {
         let mut state = self.state.write();
 
-        if let Some(grammar) = state.grammars.get_mut(name.as_ref()) {
-            match grammar {
-                AvailableGrammar::LoadFailed(error) => {
-                    tx.send(Err(error.clone())).ok();
-                }
-                AvailableGrammar::Native(grammar) | AvailableGrammar::Loaded(_, grammar) => {
-                    tx.send(Ok(grammar.clone())).ok();
-                }
-                AvailableGrammar::Loading(_, txs) => {
-                    txs.push(tx);
-                }
-                AvailableGrammar::Unloaded(wasm_path) => {
-                    let this = self.clone();
-                    let wasm_path = wasm_path.clone();
-                    *grammar = AvailableGrammar::Loading(wasm_path.clone(), vec![tx]);
-                    self.executor
-                        .spawn(async move {
-                            let grammar_result = maybe!({
-                                let wasm_bytes = std::fs::read(&wasm_path)?;
-                                let grammar_name = wasm_path
-                                    .file_stem()
-                                    .and_then(OsStr::to_str)
-                                    .ok_or_else(|| anyhow!("invalid grammar filename"))?;
-                                anyhow::Ok(PARSER.with(|parser| {
-                                    let mut parser = parser.borrow_mut();
-                                    let mut store = parser.take_wasm_store().unwrap();
-                                    let grammar = store.load_language(&grammar_name, &wasm_bytes);
-                                    parser.set_wasm_store(store).unwrap();
-                                    grammar
-                                })?)
-                            })
-                            .map_err(Arc::new);
-
-                            let value = match &grammar_result {
-                                Ok(grammar) => AvailableGrammar::Loaded(wasm_path, grammar.clone()),
-                                Err(error) => AvailableGrammar::LoadFailed(error.clone()),
-                            };
-
-                            let old_value = this.state.write().grammars.insert(name, value);
-                            if let Some(AvailableGrammar::Loading(_, txs)) = old_value {
-                                for tx in txs {
-                                    tx.send(grammar_result.clone()).ok();
-                                }
-                            }
-                        })
-                        .detach();
-                }
-            }
-        } else {
-            tx.send(Err(Arc::new(anyhow!("no such grammar {}", name))))
-                .ok();
+        match state.grammars.get_mut(name.as_ref()) {
+            Some(grammar) => Ok(grammar.0.clone()),
+            None => Err(anyhow!("no such grammar {name}")),
         }
-
-        async move { rx.await?.map_err(|e| anyhow!(e)) }
     }
 
     pub fn to_vec(&self) -> Vec<Arc<Language>> {

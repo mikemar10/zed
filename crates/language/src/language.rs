@@ -57,7 +57,7 @@ pub use task_context::{
     ContextProvider, ContextProviderWithTasks, LanguageSource, SymbolContextProvider,
 };
 use theme::SyntaxTheme;
-use tree_sitter::{self, wasmtime, Query, WasmStore};
+use tree_sitter::{self, Query};
 
 pub use buffer::Operation;
 pub use buffer::*;
@@ -81,8 +81,7 @@ pub fn init(cx: &mut AppContext) {
 
 thread_local! {
     static PARSER: RefCell<Parser> = {
-        let mut parser = Parser::new();
-        parser.set_wasm_store(WasmStore::new(WASM_ENGINE.clone()).unwrap()).unwrap();
+        let parser = Parser::new();
         RefCell::new(parser)
     };
 }
@@ -90,9 +89,6 @@ thread_local! {
 lazy_static! {
     static ref NEXT_LANGUAGE_ID: AtomicUsize = Default::default();
     static ref NEXT_GRAMMAR_ID: AtomicUsize = Default::default();
-    static ref WASM_ENGINE: wasmtime::Engine = {
-        wasmtime::Engine::new(&wasmtime::Config::new()).unwrap()
-    };
 
     /// A shared grammar for plain text, exposed for reuse by downstream crates.
     pub static ref PLAIN_TEXT: Arc<Language> = Arc::new(Language::new(
