@@ -19,7 +19,6 @@ anyhow.workspace = true
 db.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true
-install_cli.workspace = true
 picker.workspace = true
 project.workspace = true
 schemars.workspace = true

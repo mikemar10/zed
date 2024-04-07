@@ -4,7 +4,6 @@ use anyhow::{anyhow, Context as _, Result};
 use backtrace::Backtrace;
 use chrono::Utc;
 use clap::{command, Parser};
-use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
 use db::kvp::KEY_VALUE_STORE;
 use editor::Editor;
 use env_logger::Builder;
@@ -39,9 +38,8 @@ use util::{maybe, paths, ResultExt};
 use welcome::{show_welcome_view, FIRST_OPEN};
 use workspace::{AppState, WorkspaceStore};
 use zed::{
-    app_menus, build_window_options, ensure_only_instance, handle_cli_connection,
-    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions, IsOnlyInstance,
-    OpenListener, OpenRequest,
+    app_menus, build_window_options, ensure_only_instance, handle_keymap_file_changes,
+    initialize_workspace, open_paths_with_positions, IsOnlyInstance, OpenListener, OpenRequest,
 };
 
 #[global_allocator]
@@ -224,13 +222,6 @@ fn handle_open_request(
     app_state: Arc<AppState>,
     cx: &mut AppContext,
 ) -> bool {
-    if let Some(connection) = request.cli_connection {
-        let app_state = app_state.clone();
-        cx.spawn(move |cx| handle_cli_connection(connection, app_state, cx))
-            .detach();
-        return false;
-    }
-
     let mut task = None;
     if !request.open_paths.is_empty() {
         let app_state = app_state.clone();
@@ -540,7 +531,7 @@ async fn load_login_shell_environment() -> Result<()> {
 }
 
 fn stdout_is_a_pty() -> bool {
-    std::env::var(FORCE_CLI_MODE_ENV_VAR_NAME).ok().is_none() && std::io::stdout().is_terminal()
+    std::io::stdout().is_terminal()
 }
 
 #[derive(Parser, Debug)]
@@ -559,7 +550,7 @@ fn parse_url_arg(arg: &str) -> Result<String> {
     match std::fs::canonicalize(Path::new(&arg)) {
         Ok(path) => Ok(format!("file://{}", path.to_string_lossy())),
         Err(error) => {
-            if arg.starts_with("file://") || arg.starts_with("zed-cli://") {
+            if arg.starts_with("file://") {
                 Ok(arg.into())
             } else {
                 Err(anyhow!("error parsing path argument: {}", error))

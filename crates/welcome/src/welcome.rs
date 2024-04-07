@@ -112,17 +112,6 @@ impl Render for WelcomePage {
                                             })
                                             .ok();
                                     })),
-                            )
-                            .child(
-                                Button::new("install-cli", "Install the CLI")
-                                    .full_width()
-                                    .on_click(cx.listener(|_, _, cx| {
-                                        cx.app_mut()
-                                            .spawn(|cx| async move {
-                                                install_cli::install_cli(&cx).await
-                                            })
-                                            .detach_and_log_err(cx);
-                                    })),
                             ),
                     )
                     .child(

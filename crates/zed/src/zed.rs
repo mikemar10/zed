@@ -26,7 +26,7 @@ use settings::{
     initial_local_settings_content, initial_tasks_content, watch_config_file, KeymapFile, Settings,
     SettingsStore, DEFAULT_KEYMAP_PATH,
 };
-use std::{borrow::Cow, ops::Deref, path::Path, sync::Arc};
+use std::{borrow::Cow, path::Path, sync::Arc};
 use task::{
     oneshot_source::OneshotSource,
     static_source::{StaticSource, TrackedFile},
@@ -41,11 +41,11 @@ use util::{
 use uuid::Uuid;
 use vim::VimModeSetting;
 use welcome::BaseKeymap;
+use workspace::Pane;
 use workspace::{
     create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
-    open_new, AppState, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
+    open_new, AppState, NewFile, NewWindow, OpenLog, Workspace, WorkspaceSettings,
 };
-use workspace::{notifications::DetachAndPromptErr, Pane};
 use zed_actions::{OpenBrowser, OpenSettings, OpenZedUrl, Quit};
 
 actions!(
@@ -215,28 +215,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
                 theme::adjust_font_size(cx, |size| *size -= px(1.0))
             })
             .register_action(move |_, _: &ResetBufferFontSize, cx| theme::reset_font_size(cx))
-            .register_action(|_, _: &install_cli::Install, cx| {
-                cx.spawn(|workspace, mut cx| async move {
-                    let path = install_cli::install_cli(cx.deref())
-                        .await
-                        .context("error creating CLI symlink")?;
-                    workspace.update(&mut cx, |workspace, cx| {
-                        workspace.show_toast(
-                            Toast::new(
-                                0,
-                                format!(
-                                    "Installed `zed` to {}. You can launch {} from your terminal.",
-                                    path.to_string_lossy(),
-                                    "zed"
-                                ),
-                            ),
-                            cx,
-                        )
-                    })?;
-                    Ok(())
-                })
-                .detach_and_prompt_err("Error installing zed cli", cx, |_, _| None);
-            })
             .register_action(|workspace, _: &OpenLog, cx| {
                 open_log_file(workspace, cx);
             })
