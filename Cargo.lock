@@ -61,30 +61,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alacritty_terminal"
-version = "0.23.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc2c16faa5425a10be102dda76f73d76049b44746e18ddeefc44d78bbe76cbce"
-dependencies = [
- "base64 0.22.0",
- "bitflags 2.4.2",
- "home",
- "libc",
- "log",
- "miow",
- "parking_lot",
- "piper",
- "polling 3.3.2",
- "regex-automata",
- "rustix-openpty",
- "serde",
- "signal-hook",
- "unicode-width",
- "vte",
- "windows-sys 0.48.0",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -621,12 +597,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
-name = "base64"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -684,9 +654,6 @@ name = "bitflags"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "blade-graphics"
@@ -3531,15 +3498,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miow"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "359f76430b20a79f9e20e115b3428614e654f04fab314482fc0fda0ebd3c6044"
-dependencies = [
- "windows-sys 0.48.0",
-]
-
-[[package]]
 name = "multi_buffer"
 version = "0.1.0"
 dependencies = [
@@ -3646,15 +3604,6 @@ dependencies = [
  "mio",
  "walkdir",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "ntapi"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a3895c6391c39d7fe7ebc444a87eb2991b2a0bc718fdabd071eec617fc68e4"
-dependencies = [
- "winapi",
 ]
 
 [[package]]
@@ -4325,7 +4274,6 @@ dependencies = [
  "similar",
  "smol",
  "task",
- "terminal",
  "text",
  "unindent",
  "util",
@@ -4820,21 +4768,9 @@ checksum = "65e04861e65f21776e67888bfbea442b3642beaa0138fdb1dd7a84a52dffdb89"
 dependencies = [
  "bitflags 2.4.2",
  "errno",
- "itoa",
  "libc",
  "linux-raw-sys 0.4.12",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rustix-openpty"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25c3aad9fc1424eb82c88087789a7d938e1829724f3e4043163baf0d13cfc12"
-dependencies = [
- "errno",
- "libc",
- "rustix 0.38.32",
 ]
 
 [[package]]
@@ -5629,21 +5565,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sysinfo"
-version = "0.30.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c385888ef380a852a16209afc8cfad22795dd8873d69c9a14d2e2088f118d18"
-dependencies = [
- "cfg-if",
- "core-foundation-sys",
- "libc",
- "ntapi",
- "once_cell",
- "rayon",
- "windows 0.52.0",
-]
-
-[[package]]
 name = "taffy"
 version = "0.3.11"
 source = "git+https://github.com/DioxusLabs/taffy?rev=1876f72bee5e376023eaa518aa7b8a34c769bd1b#1876f72bee5e376023eaa518aa7b8a34c769bd1b"
@@ -5729,61 +5650,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "terminal"
-version = "0.1.0"
-dependencies = [
- "alacritty_terminal",
- "anyhow",
- "collections",
- "dirs 4.0.0",
- "futures 0.3.28",
- "gpui",
- "libc",
- "rand 0.8.5",
- "schemars",
- "serde",
- "serde_derive",
- "serde_json",
- "settings",
- "smol",
- "sysinfo",
- "task",
- "theme",
- "thiserror",
- "util",
- "windows 0.53.0",
-]
-
-[[package]]
-name = "terminal_view"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "collections",
- "db",
- "dirs 4.0.0",
- "editor",
- "futures 0.3.28",
- "gpui",
- "itertools 0.11.0",
- "language",
- "project",
- "rand 0.8.5",
- "search",
- "serde",
- "serde_json",
- "settings",
- "shellexpand",
- "smol",
- "task",
- "terminal",
- "theme",
- "ui",
- "util",
- "workspace",
 ]
 
 [[package]]
@@ -6672,7 +6538,7 @@ version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef8352f317d8f9a918ba5154797fb2a93e2730244041cf7d5be35148266adfa5"
 dependencies = [
- "base64 0.13.1",
+ "base64",
  "data-url",
  "flate2",
  "fontdb 0.5.4",
@@ -6843,30 +6709,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b3666211944f2e6ba2c359bc9efc1891157e910b1b11c3900892ea9f18179d2"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "vte"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40eb22ae96f050e0c0d6f7ce43feeae26c348fc4dea56928ca81537cfaa6188b"
-dependencies = [
- "bitflags 2.4.2",
- "cursor-icon",
- "log",
- "serde",
- "utf8parse",
- "vte_generate_state_changes",
-]
-
-[[package]]
-name = "vte_generate_state_changes"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
-dependencies = [
- "proc-macro2",
- "quote",
 ]
 
 [[package]]
@@ -7163,32 +7005,13 @@ dependencies = [
 
 [[package]]
 name = "windows"
-version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e48a53791691ab099e5e2ad123536d0fff50652600abaf43bbf952894110d0be"
-dependencies = [
- "windows-core 0.52.0",
- "windows-targets 0.52.4",
-]
-
-[[package]]
-name = "windows"
 version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efc5cf48f83140dcaab716eeaea345f9e93d0018fb81162753a3f76c3397b538"
 dependencies = [
- "windows-core 0.53.0",
+ "windows-core",
  "windows-implement",
  "windows-interface",
- "windows-targets 0.52.4",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ab640c8d7e35bf8ba19b884ba838ceb4fba93a4e8c65a9059d08afcfc683d9"
-dependencies = [
  "windows-targets 0.52.4",
 ]
 
@@ -7831,7 +7654,6 @@ dependencies = [
  "smol",
  "task",
  "tasks_ui",
- "terminal_view",
  "theme",
  "theme_selector",
  "tree-sitter-rust",

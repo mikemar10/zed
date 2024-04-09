@@ -1,5 +1,4 @@
 use gpui::{Menu, MenuItem, OsAction};
-use terminal_view::terminal_panel;
 
 pub fn app_menus() -> Vec<Menu<'static>> {
     use zed_actions::Quit;
@@ -122,7 +121,6 @@ pub fn app_menus() -> Vec<Menu<'static>> {
                 }),
                 MenuItem::separator(),
                 MenuItem::action("Project Panel", project_panel::ToggleFocus),
-                MenuItem::action("Terminal Panel", terminal_panel::ToggleFocus),
                 MenuItem::separator(),
                 MenuItem::action("Diagnostics", diagnostics::Deploy),
                 MenuItem::separator(),

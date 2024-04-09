@@ -4,7 +4,6 @@ pub mod lsp_ext_command;
 pub mod project_settings;
 pub mod search;
 mod task_inventory;
-pub mod terminals;
 
 #[cfg(test)]
 mod project_tests;
@@ -75,7 +74,6 @@ use std::{
     time::{Duration, Instant},
 };
 use task::static_source::{StaticSource, TrackedFile};
-use terminals::Terminals;
 use text::{Anchor, BufferId};
 use util::{
     debug_panic, defer, merge_json_value_into,
@@ -165,7 +163,6 @@ pub struct Project {
     nonce: u128,
     _maintain_buffer_languages: Task<()>,
     _maintain_workspace_config: Task<Result<()>>,
-    terminals: Terminals,
     current_lsp_settings: HashMap<Arc<str>, LspSettings>,
     tasks: Model<Inventory>,
 }
@@ -496,9 +493,6 @@ impl Project {
                 buffers_needing_diff: Default::default(),
                 git_diff_debouncer: DebouncedDelay::new(),
                 nonce: StdRng::from_entropy().gen(),
-                terminals: Terminals {
-                    local_handles: Vec::new(),
-                },
                 current_lsp_settings: ProjectSettings::get_global(cx).lsp.clone(),
                 tasks,
             }
@@ -966,13 +960,12 @@ impl Project {
         };
 
         cx.background_executor().spawn(async move {
-            match wait_for_loading_buffer(loading_watch)
-                .await {
-                    Ok(result) => Ok(result),
-                    Err(e) => {
-                        println!("error while opening buffer: {e:?}");
-                        Err(anyhow!("something went wrong"))
-                    }
+            match wait_for_loading_buffer(loading_watch).await {
+                Ok(result) => Ok(result),
+                Err(e) => {
+                    println!("error while opening buffer: {e:?}");
+                    Err(anyhow!("something went wrong"))
+                }
             }
         })
     }

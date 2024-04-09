@@ -14,7 +14,6 @@ pub use only_instance::*;
 pub use open_listener::*;
 
 use anyhow::Context as _;
-use assets::Assets;
 use futures::{channel::mpsc, select_biased, StreamExt};
 use language::LanguageSource;
 use project::TaskSourceKind;
@@ -32,9 +31,7 @@ use task::{
     static_source::{StaticSource, TrackedFile},
 };
 
-use terminal_view::terminal_panel::{self, TerminalPanel};
 use util::{
-    asset_str,
     paths::{self, LOCAL_SETTINGS_RELATIVE_PATH, LOCAL_TASKS_RELATIVE_PATH},
     ResultExt,
 };
@@ -180,14 +177,10 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
             });
         }
         cx.spawn(|workspace_handle, mut cx| async move {
-            let project_panel = ProjectPanel::load(workspace_handle.clone(), cx.clone());
-            let terminal_panel = TerminalPanel::load(workspace_handle.clone(), cx.clone());
-            let (project_panel, terminal_panel) =
-                futures::try_join!(project_panel, terminal_panel)?;
+            let project_panel = ProjectPanel::load(workspace_handle.clone(), cx.clone()).await?;
 
             workspace_handle.update(&mut cx, |workspace, cx| {
                 workspace.add_panel(project_panel, cx);
-                workspace.add_panel(terminal_panel, cx);
                 cx.focus_self();
             })
         })
@@ -217,15 +210,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
             .register_action(move |_, _: &ResetBufferFontSize, cx| theme::reset_font_size(cx))
             .register_action(|workspace, _: &OpenLog, cx| {
                 open_log_file(workspace, cx);
-            })
-            .register_action(|workspace, _: &OpenLicenses, cx| {
-                open_bundled_file(
-                    workspace,
-                    asset_str::<Assets>("licenses.md"),
-                    "Open Source License Attribution",
-                    "Markdown",
-                    cx,
-                );
             })
             .register_action(
                 move |_: &mut Workspace, _: &OpenKeymap, cx: &mut ViewContext<Workspace>| {
@@ -283,13 +267,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut AppContext) {
                  _: &project_panel::ToggleFocus,
                  cx: &mut ViewContext<Workspace>| {
                     workspace.toggle_panel_focus::<ProjectPanel>(cx);
-                },
-            )
-            .register_action(
-                |workspace: &mut Workspace,
-                 _: &terminal_panel::ToggleFocus,
-                 cx: &mut ViewContext<Workspace>| {
-                    workspace.toggle_panel_focus::<TerminalPanel>(cx);
                 },
             )
             .register_action({
@@ -2903,7 +2880,6 @@ mod tests {
             editor::init(cx);
             project_panel::init_settings(cx);
             project_panel::init((), cx);
-            terminal_view::init(cx);
             initialize_workspace(app_state.clone(), cx);
             app_state
         })

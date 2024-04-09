@@ -60,7 +60,6 @@ simplelog = "0.9"
 smol.workspace = true
 task.workspace = true
 tasks_ui.workspace = true
-terminal_view.workspace = true
 theme.workspace = true
 theme_selector.workspace = true
 urlencoding = "2.1.2"

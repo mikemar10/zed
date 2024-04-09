@@ -160,7 +160,6 @@ fn main() {
         tasks_ui::init(cx);
         search::init(cx);
         vim::init(cx);
-        terminal_view::init(cx);
 
         language_selector::init(cx);
         theme_selector::init(cx);
