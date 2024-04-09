@@ -12,12 +12,8 @@ workspace = true
 path = "src/vim.rs"
 doctest = false
 
-[features]
-neovim = ["nvim-rs", "async-compat", "async-trait", "tokio"]
-
 [dependencies]
 anyhow.workspace = true
-async-compat = { version = "0.2.1", "optional" = true }
 async-trait = { workspace = true, "optional" = true }
 collections.workspace = true
 command_palette_hooks.workspace = true
@@ -25,16 +21,12 @@ editor.workspace = true
 gpui.workspace = true
 language.workspace = true
 log.workspace = true
-nvim-rs = { git = "https://github.com/KillTheMule/nvim-rs", branch = "master", features = [
-    "use_tokio",
-], optional = true }
 regex.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_derive.workspace = true
 serde_json.workspace = true
 settings.workspace = true
-tokio = { version = "1.15", "optional" = true }
 ui.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
