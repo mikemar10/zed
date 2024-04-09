@@ -159,7 +159,6 @@
       //     "focus": false
       //   }
       // ],
-      "ctrl->": "assistant::QuoteSelection"
     }
   },
   {
@@ -182,23 +181,6 @@
       "ctrl-enter": "editor::Newline",
       "shift-enter": "editor::Newline",
       "ctrl-shift-enter": "editor::NewlineBelow"
-    }
-  },
-  {
-    "context": "AssistantPanel",
-    "bindings": {
-      "ctrl-g": "search::SelectNextMatch",
-      "ctrl-shift-g": "search::SelectPrevMatch"
-    }
-  },
-  {
-    "context": "ConversationEditor > Editor",
-    "bindings": {
-      "ctrl-enter": "assistant::Assist",
-      "ctrl-s": "workspace::Save",
-      "ctrl->": "assistant::QuoteSelection",
-      "shift-enter": "assistant::Split",
-      "ctrl-r": "assistant::CycleMessageRole"
     }
   },
   {
@@ -394,14 +376,12 @@
       //     }
       // ]
       "alt-ctrl-o": "projects::OpenRecent",
-      "alt-ctrl-shift-b": "branches::OpenRecent",
-      "ctrl-~": "workspace::NewTerminal",
+      //"alt-ctrl-shift-b": "branches::OpenRecent",
       "ctrl-s": "workspace::Save",
       "ctrl-k s": "workspace::SaveWithoutFormat",
       "ctrl-shift-s": "workspace::SaveAs",
       "ctrl-n": "workspace::NewFile",
       "ctrl-shift-n": "workspace::NewWindow",
-      "ctrl-`": "terminal_panel::ToggleFocus",
       "alt-1": ["workspace::ActivatePane", 0],
       "alt-2": ["workspace::ActivatePane", 1],
       "alt-3": ["workspace::ActivatePane", 2],
@@ -424,7 +404,6 @@
       "ctrl-shift-p": "command_palette::Toggle",
       "ctrl-shift-m": "diagnostics::Deploy",
       "ctrl-shift-e": "project_panel::ToggleFocus",
-      "ctrl-?": "assistant::ToggleFocus",
       "ctrl-alt-s": "workspace::SaveAll",
       "ctrl-k m": "language_selector::Toggle",
       "ctrl-k ctrl-left": ["workspace::ActivatePaneInDirection", "Left"],
@@ -513,7 +492,6 @@
       "ctrl-k enter": "editor::OpenExcerptsSplit",
       "ctrl-f8": "editor::GoToHunk",
       "ctrl-shift-f8": "editor::GoToPrevHunk",
-      "ctrl-enter": "assistant::InlineAssist"
     }
   },
   {
@@ -553,20 +531,5 @@
   {
     "context": "FileFinder",
     "bindings": { "ctrl-shift-p": "file_finder::SelectPrev" }
-  },
-  {
-    "context": "Terminal",
-    "bindings": {
-      "ctrl-alt-space": "terminal::ShowCharacterPalette",
-      "shift-ctrl-c": "terminal::Copy",
-      "shift-ctrl-v": "terminal::Paste",
-      "up": ["terminal::SendKeystroke", "up"],
-      "pageup": ["terminal::SendKeystroke", "pageup"],
-      "down": ["terminal::SendKeystroke", "down"],
-      "pagedown": ["terminal::SendKeystroke", "pagedown"],
-      "escape": ["terminal::SendKeystroke", "escape"],
-      "enter": ["terminal::SendKeystroke", "enter"],
-      "ctrl-c": ["terminal::SendKeystroke", "ctrl-c"]
-    }
   }
 ]
